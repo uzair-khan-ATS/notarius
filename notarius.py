@@ -1996,30 +1996,42 @@ def cmd_watch() -> None:
         stop.set()
 
 
-# The Notarius mark: an "N" whose right leg is a pen nib (the Roman notarii were the scribes
-# who took down speeches word for word). Coordinates on a 64-unit grid; logo.svg is the same.
+# The Notarius mark: a speech bubble (the conversation) whose tail is the scribe's pen nib, writing
+# it down; inside, a Roman capital N (the Roman notarii took down speeches word for word).
+# Coordinates on a 64-unit grid; logo.svg is drawn from the same numbers.
 LOGO_N = [  # a Roman inscription capital: slim verticals, heavy diagonal, serifs
-    [(17, 17), (22, 17), (22, 47), (17, 47)],                                     # left leg
-    [(12.5, 45.5), (26.5, 45.5), (26.5, 49), (12.5, 49)],                         # foot serif
-    [(12.5, 15), (26, 15), (26, 18.5), (12.5, 18.5)],                             # top-left serif
-    [(17, 15), (27, 15), (47.5, 41), (39.5, 41)],                                 # heavy diagonal
-    [(37.5, 15), (51.5, 15), (51.5, 18.5), (37.5, 18.5)],                         # top-right serif
-    [(42, 17), (47, 17), (47, 35), (48.6, 41), (44.5, 51.5), (40.4, 41), (42, 35)],  # leg -> pen nib
+    [(17, 17), (22, 17), (22, 47), (17, 47)],                  # left leg
+    [(12.5, 45.5), (26.5, 45.5), (26.5, 49), (12.5, 49)],      # foot serif
+    [(12.5, 15), (26, 15), (26, 18.5), (12.5, 18.5)],          # top-left serif
+    [(17, 15), (27, 15), (47, 49), (39, 49)],                  # heavy diagonal
+    [(37.5, 15), (51.5, 15), (51.5, 18.5), (37.5, 18.5)],      # top-right serif
+    [(42, 17), (47, 17), (47, 49), (42, 49)],                  # right leg
 ]
-LOGO_NIB = {"tip": (44.5, 51.5), "slit_top": (44.5, 42.5), "hole": (44.5, 41.5), "hole_r": 1.6, "slit_w": 1.3}
-
-
-# Flat tile in Teams-like purple; a white speech bubble (the conversation) with the Roman N whose
-# right leg is the scribe's pen nib.
 LOGO_PURPLE = "#4f46e5"
-LOGO_BUBBLE = (9, 9, 55, 47, 10)                     # x0, y0, x1, y1, corner radius
-LOGO_TAIL = [(15, 44), (27, 44), (12, 56)]
-LOGO_N_FIT = (0.66, 18.6, 15.2)                      # scale, x offset, y offset for the N inside
+LOGO_BUBBLE = (9, 9, 55, 46, 10)                     # x0, y0, x1, y1, corner radius
+LOGO_N_FIT = (0.66, 19.1, 16.3)                      # scale, x offset, y offset for the N inside
+LOGO_NIB_AXIS = ((21.5, 43.0), (10.0, 58.5))         # nib: where it leaves the bubble -> its tip
 
 
 def _logo_n_point(x: float, y: float) -> tuple[float, float]:
     k, ox, oy = LOGO_N_FIT
     return ox + (x - 12.5) * k, oy + (y - 15) * k
+
+
+def _logo_nib() -> tuple[list[tuple[float, float]], tuple[float, float], tuple[tuple[float, float], tuple[float, float]]]:
+    """The bubble's tail as a fountain-pen nib: (outline, breather hole, slit)."""
+    import math
+
+    (bx, by), (tx, ty) = LOGO_NIB_AXIS
+    length = math.hypot(tx - bx, ty - by)
+    ux, uy = (tx - bx) / length, (ty - by) / length
+    px, py = -uy, ux
+
+    def at(t: float, w: float) -> tuple[float, float]:
+        return bx + ux * t + px * w, by + uy * t + py * w
+
+    outline = [at(-5, 6.2), at(4.5, 6.6), at(9, 4.6), (tx, ty), at(9, -4.6), at(4.5, -6.6), at(-5, -6.2)]
+    return outline, at(6.2, 0), (at(7.6, 0), at(length - 0.6, 0))
 
 
 def icon_image(color: str = LOGO_PURPLE, size: int = 64):
@@ -2032,31 +2044,28 @@ def icon_image(color: str = LOGO_PURPLE, size: int = 64):
     d.rounded_rectangle((4 * s, 4 * s, 60 * s, 60 * s), radius=14 * s, fill=color)   # tile (status colour)
     x0, y0, x1, y1, r = LOGO_BUBBLE
     d.rounded_rectangle((x0 * s, y0 * s, x1 * s, y1 * s), radius=r * s, fill="white")  # speech bubble
-    d.polygon([(x * s, y * s) for x, y in LOGO_TAIL], fill="white")
+    outline, (hx, hy), ((sx, sy), (ex, ey)) = _logo_nib()
+    d.polygon([(x * s, y * s) for x, y in outline], fill="white")                      # tail = pen nib
+    d.line([(sx * s, sy * s), (ex * s, ey * s)], fill=color, width=max(1, round(1.4 * s)))  # nib slit
+    d.ellipse(((hx - 1.7) * s, (hy - 1.7) * s, (hx + 1.7) * s, (hy + 1.7) * s), fill=color)  # breather hole
     for poly in LOGO_N:
         d.polygon([tuple(c * s for c in _logo_n_point(x, y)) for x, y in poly], fill=color)
-    k = LOGO_N_FIT[0]
-    (sx, sy), (_, ey), (hx, hy) = (_logo_n_point(*LOGO_NIB[key]) for key in ("tip", "slit_top", "hole"))
-    d.line([(sx * s, sy * s), (sx * s, ey * s)], fill="white", width=max(1, round(LOGO_NIB["slit_w"] * k * s)))
-    rr = LOGO_NIB["hole_r"] * k
-    d.ellipse(((hx - rr) * s, (hy - rr) * s, (hx + rr) * s, (hy + rr) * s), fill="white")
     return img.resize((size, size), Image.LANCZOS)
 
 
 def logo_svg(color: str = LOGO_PURPLE) -> str:
     """The same mark as SVG (dashboard, favicon, docs)."""
     x0, y0, x1, y1, r = LOGO_BUBBLE
-    pts = lambda poly: " ".join(f"{px:.2f},{py:.2f}" for px, py in (_logo_n_point(x, y) for x, y in poly))
-    n = "".join(f'<polygon points="{pts(p)}"/>' for p in LOGO_N)
-    (sx, sy), (_, ey), (hx, hy) = (_logo_n_point(*LOGO_NIB[key]) for key in ("tip", "slit_top", "hole"))
-    k = LOGO_N_FIT[0]
+    pts = lambda poly: " ".join(f"{px:.2f},{py:.2f}" for px, py in poly)
+    n = "".join(f'<polygon points="{pts([_logo_n_point(x, y) for x, y in p])}"/>' for p in LOGO_N)
+    outline, (hx, hy), ((sx, sy), (ex, ey)) = _logo_nib()
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
             f'<rect x="4" y="4" width="56" height="56" rx="14" fill="{color}"/>'
             f'<rect x="{x0}" y="{y0}" width="{x1 - x0}" height="{y1 - y0}" rx="{r}" fill="#fff"/>'
-            f'<polygon points="{" ".join(f"{x},{y}" for x, y in LOGO_TAIL)}" fill="#fff"/>'
-            f'<g fill="{color}">{n}</g>'
-            f'<path d="M{sx:.2f} {sy:.2f}V{ey:.2f}" stroke="#fff" stroke-width="{LOGO_NIB["slit_w"] * k:.2f}"/>'
-            f'<circle cx="{hx:.2f}" cy="{hy:.2f}" r="{LOGO_NIB["hole_r"] * k:.2f}" fill="#fff"/></svg>')
+            f'<polygon points="{pts(outline)}" fill="#fff"/>'
+            f'<path d="M{sx:.2f} {sy:.2f}L{ex:.2f} {ey:.2f}" stroke="{color}" stroke-width="1.4" stroke-linecap="round"/>'
+            f'<circle cx="{hx:.2f}" cy="{hy:.2f}" r="1.7" fill="{color}"/>'
+            f'<g fill="{color}">{n}</g></svg>')
 
 
 def save_icon(path: Path) -> Path:

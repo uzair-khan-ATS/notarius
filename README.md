@@ -1,4 +1,4 @@
-﻿<p align="center"><img src="assets/logo.svg" width="96" alt="Notarius logo: a white speech bubble on a purple tile, holding a Roman capital N whose right leg is a pen nib"></p>
+﻿<p align="center"><img src="assets/logo.svg" width="96" alt="Notarius logo: a white speech bubble on a purple tile whose tail is a pen nib, with a Roman capital N inside"></p>
 
 <h1 align="center">Notarius</h1>
 

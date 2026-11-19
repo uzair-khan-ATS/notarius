@@ -82,8 +82,8 @@ You don't need to do anything. Keep Notarius running; it starts with Windows.
 | Amber | Writing minutes |
 | Grey | Paused: not taking notes |
 
-The icon is a speech bubble (the conversation) holding a Roman letter N whose right leg is a pen
-nib. That pen is the scribe's, the *notarius* the app is named after.
+The icon is a speech bubble (the conversation) whose tail is a pen nib writing it down, with a Roman
+letter N inside. The pen is the scribe's, the *notarius* the app is named after.
 
 The tray icon is under **^** next to the clock. You can drag it onto the taskbar to keep it
 visible.
