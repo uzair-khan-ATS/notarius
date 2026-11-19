@@ -2004,21 +2004,17 @@ LOGO_N = [  # a Roman inscription capital: slim verticals, heavy diagonal, serif
     [(12.5, 15), (26, 15), (26, 18.5), (12.5, 18.5)],                             # top-left serif
     [(17, 15), (27, 15), (47.5, 41), (39.5, 41)],                                 # heavy diagonal
     [(37.5, 15), (51.5, 15), (51.5, 18.5), (37.5, 18.5)],                         # top-right serif
-    [(42, 17), (47, 17), (47, 29), (52, 37.5), (44.5, 55), (37, 37.5), (42, 29)],  # leg -> fountain-pen nib
+    [(42, 17), (47, 17), (47, 35), (48.6, 41), (44.5, 51.5), (40.4, 41), (42, 35)],  # leg -> pen nib
 ]
-LOGO_NIB = {"tip": (44.5, 55), "slit_top": (44.5, 42.5), "hole": (44.5, 40.5), "hole_r": 2.5, "slit_w": 1.9}
+LOGO_NIB = {"tip": (44.5, 51.5), "slit_top": (44.5, 42.5), "hole": (44.5, 41.5), "hole_r": 1.6, "slit_w": 1.3}
 
 
-# Modern flat tile in Teams-like purple. Inside, the speech bubble (the conversation) is drawn as
-# a Roman wax tablet (tabula cerata): a white frame around a wax writing surface, with the two
-# binding holes the tablets were laced through. On the wax, the Roman N whose right leg is the
-# scribe's pen nib.
-LOGO_PURPLE, LOGO_WAX = "#4f46e5", "#e7e5ff"
-LOGO_BUBBLE = (9, 9, 55, 47, 10)                     # tablet frame: x0, y0, x1, y1, corner radius
-LOGO_WAX_INSET = 3.4                                 # frame width around the wax surface
-LOGO_HOLES = [(25, 11.2), (39, 11.2)]                # binding holes in the top of the frame
+# Flat tile in Teams-like purple; a white speech bubble (the conversation) with the Roman N whose
+# right leg is the scribe's pen nib.
+LOGO_PURPLE = "#4f46e5"
+LOGO_BUBBLE = (9, 9, 55, 47, 10)                     # x0, y0, x1, y1, corner radius
 LOGO_TAIL = [(15, 44), (27, 44), (12, 56)]
-LOGO_N_FIT = (0.64, 19.6, 14.2)                      # scale, x offset, y offset for the N on the wax
+LOGO_N_FIT = (0.66, 18.6, 15.2)                      # scale, x offset, y offset for the N inside
 
 
 def _logo_n_point(x: float, y: float) -> tuple[float, float]:
@@ -2035,40 +2031,32 @@ def icon_image(color: str = LOGO_PURPLE, size: int = 64):
     d = ImageDraw.Draw(img)
     d.rounded_rectangle((4 * s, 4 * s, 60 * s, 60 * s), radius=14 * s, fill=color)   # tile (status colour)
     x0, y0, x1, y1, r = LOGO_BUBBLE
-    d.rounded_rectangle((x0 * s, y0 * s, x1 * s, y1 * s), radius=r * s, fill="white")  # tablet frame
+    d.rounded_rectangle((x0 * s, y0 * s, x1 * s, y1 * s), radius=r * s, fill="white")  # speech bubble
     d.polygon([(x * s, y * s) for x, y in LOGO_TAIL], fill="white")
-    i = LOGO_WAX_INSET
-    d.rounded_rectangle(((x0 + i) * s, (y0 + i) * s, (x1 - i) * s, (y1 - i) * s), radius=(r - i) * s, fill=LOGO_WAX)
-    if size >= 48:
-        for hx, hy in LOGO_HOLES:
-            d.ellipse(((hx - 0.9) * s, (hy - 0.9) * s, (hx + 0.9) * s, (hy + 0.9) * s), fill=color)
     for poly in LOGO_N:
         d.polygon([tuple(c * s for c in _logo_n_point(x, y)) for x, y in poly], fill=color)
     k = LOGO_N_FIT[0]
     (sx, sy), (_, ey), (hx, hy) = (_logo_n_point(*LOGO_NIB[key]) for key in ("tip", "slit_top", "hole"))
-    d.line([(sx * s, sy * s), (sx * s, ey * s)], fill=LOGO_WAX, width=max(1, round(LOGO_NIB["slit_w"] * k * s)))
+    d.line([(sx * s, sy * s), (sx * s, ey * s)], fill="white", width=max(1, round(LOGO_NIB["slit_w"] * k * s)))
     rr = LOGO_NIB["hole_r"] * k
-    d.ellipse(((hx - rr) * s, (hy - rr) * s, (hx + rr) * s, (hy + rr) * s), fill=LOGO_WAX)
+    d.ellipse(((hx - rr) * s, (hy - rr) * s, (hx + rr) * s, (hy + rr) * s), fill="white")
     return img.resize((size, size), Image.LANCZOS)
 
 
 def logo_svg(color: str = LOGO_PURPLE) -> str:
     """The same mark as SVG (dashboard, favicon, docs)."""
     x0, y0, x1, y1, r = LOGO_BUBBLE
-    i = LOGO_WAX_INSET
     pts = lambda poly: " ".join(f"{px:.2f},{py:.2f}" for px, py in (_logo_n_point(x, y) for x, y in poly))
     n = "".join(f'<polygon points="{pts(p)}"/>' for p in LOGO_N)
-    holes = "".join(f'<circle cx="{hx}" cy="{hy}" r="0.9"/>' for hx, hy in LOGO_HOLES)
     (sx, sy), (_, ey), (hx, hy) = (_logo_n_point(*LOGO_NIB[key]) for key in ("tip", "slit_top", "hole"))
     k = LOGO_N_FIT[0]
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
             f'<rect x="4" y="4" width="56" height="56" rx="14" fill="{color}"/>'
             f'<rect x="{x0}" y="{y0}" width="{x1 - x0}" height="{y1 - y0}" rx="{r}" fill="#fff"/>'
             f'<polygon points="{" ".join(f"{x},{y}" for x, y in LOGO_TAIL)}" fill="#fff"/>'
-            f'<rect x="{x0 + i}" y="{y0 + i}" width="{x1 - x0 - 2 * i:.1f}" height="{y1 - y0 - 2 * i:.1f}" rx="{r - i:.1f}" fill="{LOGO_WAX}"/>'
-            f'<g fill="{color}">{holes}{n}</g>'
-            f'<path d="M{sx:.2f} {sy:.2f}V{ey:.2f}" stroke="{LOGO_WAX}" stroke-width="{LOGO_NIB["slit_w"] * k:.2f}"/>'
-            f'<circle cx="{hx:.2f}" cy="{hy:.2f}" r="{LOGO_NIB["hole_r"] * k:.2f}" fill="{LOGO_WAX}"/></svg>')
+            f'<g fill="{color}">{n}</g>'
+            f'<path d="M{sx:.2f} {sy:.2f}V{ey:.2f}" stroke="#fff" stroke-width="{LOGO_NIB["slit_w"] * k:.2f}"/>'
+            f'<circle cx="{hx:.2f}" cy="{hy:.2f}" r="{LOGO_NIB["hole_r"] * k:.2f}" fill="#fff"/></svg>')
 
 
 def save_icon(path: Path) -> Path:
