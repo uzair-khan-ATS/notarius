@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meeting Notes</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1c2026; --muted: #69707d; --line: #e3e6eb;
+  --accent: #3b5bdb; --accent-soft: #e7ecff; --sel: #3b5bdb; --sel-text: #fff;
+  --ok: #2b8a3e; --ok-soft: #e6f4ea; --warn: #b26a00; --warn-soft: #fff4e0;
+  --bad: #c92a2a; --bad-soft: #fdecec; --me: #0b7285; --me-soft: #e3f6f8;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111317; --panel: #1a1d23; --text: #e6e8ec; --muted: #9098a5; --line: #2a2f37;
+    --accent: #7b93ff; --accent-soft: #232b48; --sel: #5c7cfa; --sel-text: #fff;
+    --ok: #69db7c; --ok-soft: #1b2e21; --warn: #ffc078; --warn-soft: #33281a;
+    --bad: #ff8787; --bad-soft: #3a1f1f; --me: #66d9e8; --me-soft: #15303a;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+
+.app { display: grid; grid-template-columns: 300px 340px 1fr; height: 100vh; }
+.col { overflow: auto; border-right: 1px solid var(--line); }
+.col:last-child { border-right: 0; }
+.left, .mid { background: var(--panel); }
+.pad { padding: 16px; }
+h2.section { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 0 8px; }
+
+/* calendar */
+.cal-head { display: flex; align-items: center; gap: 6px; }
+.cal-head .month { flex: 1; font-weight: 600; font-size: 15px; }
+.icon-btn { border: 1px solid var(--line); background: transparent; border-radius: 6px; width: 30px; height: 30px; }
+.icon-btn:hover, .chip:hover { background: var(--accent-soft); }
+.grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-top: 10px; user-select: none; }
+.dow { text-align: center; font-size: 11px; color: var(--muted); padding: 4px 0; }
+.day { position: relative; aspect-ratio: 1; border: 0; background: transparent; border-radius: 8px; font-size: 13px; }
+.day:hover { background: var(--accent-soft); }
+.day.out { color: var(--muted); opacity: .45; }
+.day.today { outline: 1.5px solid var(--accent); outline-offset: -2px; }
+.day.sel { background: var(--sel); color: var(--sel-text); }
+.day .n { position: absolute; left: 50%; bottom: 3px; transform: translateX(-50%); display: flex; gap: 2px; }
+.day .n i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+.day.sel .n i { background: var(--sel-text); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.chip { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 3px 10px; font-size: 12px; }
+.hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+textarea { width: 100%; min-height: 140px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; padding: 10px; background: var(--bg); }
+textarea:focus, input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.save-state { font-size: 12px; color: var(--muted); height: 18px; }
+
+/* meeting list */
+.search { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; background: var(--bg); }
+.group { margin-top: 14px; }
+.group-date { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+.mtg { display: block; width: 100%; text-align: left; border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 10px 12px; margin-bottom: 6px; }
+.mtg:hover { border-color: var(--accent); }
+.mtg.active { border-color: var(--accent); background: var(--accent-soft); }
+.mtg .t { font-weight: 600; }
+.mtg .m { font-size: 12px; color: var(--muted); display: flex; gap: 8px; align-items: center; margin-top: 2px; }
+.pill { font-size: 11px; border-radius: 999px; padding: 1px 8px; font-weight: 600; }
+.pill.ready { color: var(--ok); background: var(--ok-soft); }
+.pill.processing { color: var(--warn); background: var(--warn-soft); }
+.pill.recording, .pill.failed { color: var(--bad); background: var(--bad-soft); }
+.empty { color: var(--muted); padding: 24px 4px; text-align: center; }
+
+/* detail */
+.detail { max-width: 900px; margin: 0 auto; padding: 24px 28px 60px; }
+.detail-head h1 { font-size: 22px; margin: 0 0 4px; }
+.detail-head .m { color: var(--muted); }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 18px 0 16px; }
+.tab { border: 0; background: transparent; padding: 8px 12px; border-bottom: 2px solid transparent; color: var(--muted); font-weight: 600; }
+.tab.on { color: var(--text); border-bottom-color: var(--accent); }
+.md h1 { font-size: 20px; } .md h2 { font-size: 17px; margin-top: 24px; } .md h3 { font-size: 15px; margin-top: 18px; }
+.md table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 13px; }
+.md th, .md td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+.md th { background: var(--bg); }
+.md code { background: var(--bg); padding: 1px 4px; border-radius: 4px; }
+.tr-line { display: grid; grid-template-columns: 64px 70px 1fr; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.tr-time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; padding-top: 2px; }
+.tr-who { font-size: 12px; font-weight: 700; padding-top: 2px; }
+.tr-who.me { color: var(--me); }
+.banner { border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; display: flex; gap: 12px; align-items: center; }
+.banner.bad { background: var(--bad-soft); color: var(--bad); }
+.banner.warn { background: var(--warn-soft); color: var(--warn); }
+.btn { border: 1px solid currentColor; background: transparent; border-radius: 6px; padding: 3px 10px; }
+.placeholder { color: var(--muted); text-align: center; margin-top: 18vh; }
+
+@media (max-width: 1000px) {
+  .app { grid-template-columns: 1fr; height: auto; }
+  .col { border-right: 0; border-bottom: 1px solid var(--line); overflow: visible; }
+  .detail { padding: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="col left"><div class="pad">
+    <div class="cal-head">
+      <button class="icon-btn" id="prev" aria-label="Previous month">&#8249;</button>
+      <div class="month" id="month"></div>
+      <button class="icon-btn" id="next" aria-label="Next month">&#8250;</button>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="chips">
+      <button class="chip" data-range="today">Today</button>
+      <button class="chip" data-range="week">This week</button>
+      <button class="chip" data-range="month">This month</button>
+      <button class="chip" data-range="all">All</button>
+    </div>
+    <div class="hint">Click a day. Shift+click selects a range, Ctrl+click adds days.</div>
+    <div id="daynotes-wrap" hidden>
+      <h2 class="section" id="daynotes-label">Day notes</h2>
+      <textarea id="daynotes" placeholder="Notes for this day..."></textarea>
+      <div class="save-state" id="daynotes-state"></div>
+    </div>
+  </div></aside>
+
+  <section class="col mid"><div class="pad">
+    <input class="search" id="search" placeholder="Filter by title..." aria-label="Filter meetings">
+    <div id="list"></div>
+  </div></section>
+
+  <main class="col right"><div class="detail" id="detail">
+    <div class="placeholder">Select a meeting to see its minutes and action items.</div>
+  </div></main>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const pad = (n) => String(n).padStart(2, "0");
+const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parseYmd = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const api = (path, opts = {}) => fetch(path, { ...opts, headers: { "X-Notetaker": "1", ...(opts.headers || {}) } });
+
+let meetings = [];
+let view = new Date(); view.setDate(1);
+let selected = new Set([ymd(new Date())]);
+let anchor = ymd(new Date());
+let activeId = null, activeTab = "minutes", current = null;
+
+// ---------- minimal, safe markdown (input is escaped before any markup is added)
+function inline(s) {
+  return s.replace(/`([^`]+)`/g, "<code>$1</code>")
+          .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+          .replace(/(^|[^*\w])\*([^*\s][^*]*?)\*(?!\w)/g, "$1<em>$2</em>");
+}
+function md(src) {
+  const lines = src.replace(/\r/g, "").split("\n");
+  let html = "", i = 0;
+  const isBlock = (l) => /^(#{1,4}\s|\s*\||\s*[-*]\s|\s*\d+\.\s)/.test(l);
+  while (i < lines.length) {
+    const l = lines[i];
+    if (!l.trim()) { i++; continue; }
+    let m;
+    if ((m = l.match(/^(#{1,4})\s+(.*)/))) { const n = m[1].length; html += `<h${n}>${inline(esc(m[2]))}</h${n}>`; i++; continue; }
+    if (/^\s*\|/.test(l)) {
+      const rows = [];
+      while (i < lines.length && /^\s*\|/.test(lines[i])) rows.push(lines[i++]);
+      const cells = (r) => r.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+      html += "<table>" + rows.filter((r) => !/^\s*\|?\s*:?-{3,}/.test(r)).map((r, k) => {
+        const tag = k === 0 ? "th" : "td";
+        return "<tr>" + cells(r).map((c) => `<${tag}>${inline(esc(c))}</${tag}>`).join("") + "</tr>";
+      }).join("") + "</table>";
+      continue;
+    }
+    if (/^\s*([-*]|\d+\.)\s+/.test(l)) {
+      const ordered = /^\s*\d+\.\s/.test(l);
+      html += ordered ? "<ol>" : "<ul>";
+      while (i < lines.length && /^\s*([-*]|\d+\.)\s+/.test(lines[i])) {
+        let item = lines[i++].replace(/^\s*([-*]|\d+\.)\s+/, "");
+        let box = "";
+        const cb = item.match(/^\[( |x)\]\s+/i);
+        if (cb) { box = cb[1].trim() ? "&#9745; " : "&#9744; "; item = item.slice(cb[0].length); }
+        html += `<li>${box}${inline(esc(item))}</li>`;
+      }
+      html += ordered ? "</ol>" : "</ul>";
+      continue;
+    }
+    const para = [];
+    while (i < lines.length && lines[i].trim() && !isBlock(lines[i])) para.push(lines[i++]);
+    html += `<p>${inline(esc(para.join(" ")))}</p>`;
+  }
+  return html;
+}
+function transcriptHtml(src) {
+  const rows = src.replace(/\r/g, "").split("\n").map((l) => l.match(/^\[(\d\d:\d\d:\d\d)\] \*\*(.+?):\*\* (.*)$/)).filter(Boolean);
+  if (!rows.length) return `<div class="md">${md(src)}</div>`;
+  return rows.map(([, t, who, text]) =>
+    `<div class="tr-line"><div class="tr-time">${t}</div><div class="tr-who ${who === "Me" ? "me" : ""}">${esc(who)}</div><div>${esc(text)}</div></div>`).join("");
+}
+
+// ---------- calendar
+function countsByDay() {
+  const c = {};
+  for (const m of meetings) c[m.date] = (c[m.date] || 0) + 1;
+  return c;
+}
+function renderCalendar() {
+  $("#month").textContent = view.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const counts = countsByDay();
+  const first = new Date(view);
+  const start = new Date(first); start.setDate(1 - ((first.getDay() + 6) % 7)); // Monday-first
+  const today = ymd(new Date());
+  let html = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => `<div class="dow">${d}</div>`).join("");
+  for (let k = 0; k < 42; k++) {
+    const d = new Date(start); d.setDate(start.getDate() + k);
+    const key = ymd(d), n = counts[key] || 0;
+    const cls = ["day", d.getMonth() !== view.getMonth() ? "out" : "", key === today ? "today" : "", selected.has(key) ? "sel" : ""].join(" ");
+    const dots = n ? `<span class="n">${"<i></i>".repeat(Math.min(n, 4))}</span>` : "";
+    html += `<button class="${cls}" data-day="${key}" title="${n ? n + " meeting" + (n > 1 ? "s" : "") : ""}">${d.getDate()}${dots}</button>`;
+  }
+  $("#grid").innerHTML = html;
+}
+function selectRange(a, b) {
+  let [x, y] = [parseYmd(a), parseYmd(b)];
+  if (x > y) [x, y] = [y, x];
+  const out = new Set();
+  for (const d = new Date(x); d <= y; d.setDate(d.getDate() + 1)) out.add(ymd(d));
+  return out;
+}
+$("#grid").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-day]"); if (!b) return;
+  const key = b.dataset.day;
+  if (e.shiftKey) selected = selectRange(anchor, key);
+  else if (e.ctrlKey || e.metaKey) { selected.has(key) ? selected.delete(key) : selected.add(key); anchor = key; }
+  else { selected = new Set([key]); anchor = key; }
+  refresh();
+});
+$("#prev").onclick = () => { view.setMonth(view.getMonth() - 1); renderCalendar(); };
+$("#next").onclick = () => { view.setMonth(view.getMonth() + 1); renderCalendar(); };
+document.querySelectorAll("[data-range]").forEach((b) => b.onclick = () => {
+  const now = new Date(), t = ymd(now);
+  const r = b.dataset.range;
+  if (r === "today") selected = new Set([t]);
+  if (r === "week") { const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay() + 6) % 7)); const sun = new Date(mon); sun.setDate(mon.getDate() + 6); selected = selectRange(ymd(mon), ymd(sun)); }
+  if (r === "month") { const a = new Date(view.getFullYear(), view.getMonth(), 1), z = new Date(view.getFullYear(), view.getMonth() + 1, 0); selected = selectRange(ymd(a), ymd(z)); }
+  if (r === "all") selected = new Set(meetings.map((m) => m.date));
+  if (r !== "month") { view = new Date(now.getFullYear(), now.getMonth(), 1); }
+  anchor = t;
+  refresh();
+});
+
+// ---------- meeting list
+function renderList() {
+  const q = $("#search").value.trim().toLowerCase();
+  const rows = meetings.filter((m) => selected.has(m.date) && (!q || (m.title || "").toLowerCase().includes(q)))
+                       .sort((a, b) => b.id.localeCompare(a.id));
+  if (!rows.length) {
+    $("#list").innerHTML = `<div class="empty">${selected.size ? "No meetings on the selected day" + (selected.size > 1 ? "s" : "") + "." : "Select a day on the calendar."}</div>`;
+    return;
+  }
+  const groups = {};
+  for (const m of rows) (groups[m.date] ||= []).push(m);
+  $("#list").innerHTML = Object.entries(groups).map(([date, ms]) => `
+    <div class="group"><div class="group-date">${parseYmd(date).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</div>
+    ${ms.map((m) => `
+      <button class="mtg ${m.id === activeId ? "active" : ""}" data-id="${m.id}">
+        <div class="t">${esc(m.title || "Teams meeting")}</div>
+        <div class="m"><span>${m.start}${m.end ? "–" + m.end : ""}</span>${m.duration_min != null ? `<span>${m.duration_min} min</span>` : ""}
+          ${m.status !== "ready" ? `<span class="pill ${m.status}">${m.status}</span>` : ""}${m.has_my_notes ? "<span>&#9998; my notes</span>" : ""}</div>
+      </button>`).join("")}</div>`).join("");
+}
+$("#list").addEventListener("click", (e) => { const b = e.target.closest("[data-id]"); if (b) openMeeting(b.dataset.id); });
+$("#search").addEventListener("input", renderList);
+
+// ---------- day notes (single selected day)
+let dayKey = null, dayTimer = null;
+async function renderDayNotes() {
+  const wrap = $("#daynotes-wrap");
+  if (selected.size !== 1) { wrap.hidden = true; dayKey = null; return; }
+  const key = [...selected][0];
+  wrap.hidden = false;
+  if (key === dayKey) return;
+  dayKey = key;
+  $("#daynotes-label").textContent = "Notes for " + parseYmd(key).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  $("#daynotes").value = "";
+  $("#daynotes-state").textContent = "";
+  const r = await api(`/api/days/${key}`);
+  if (dayKey === key) $("#daynotes").value = (await r.json()).notes;
+}
+$("#daynotes").addEventListener("input", () => {
+  const key = dayKey, text = $("#daynotes").value;
+  $("#daynotes-state").textContent = "Saving...";
+  clearTimeout(dayTimer);
+  dayTimer = setTimeout(async () => {
+    const r = await api(`/api/days/${key}`, { method: "PUT", body: text });
+    $("#daynotes-state").textContent = r.ok ? "Saved" : "Save failed";
+  }, 600);
+});
+
+// ---------- meeting detail
+async function openMeeting(id) {
+  activeId = id; renderList();
+  history.replaceState(null, "", "#" + id);
+  const r = await api(`/api/meetings/${id}`);
+  if (!r.ok) return;
+  current = await r.json();
+  renderDetail();
+}
+let noteTimer = null;
+function renderDetail() {
+  const m = current; if (!m) return;
+  const when = parseYmd(m.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  let banner = "";
+  if (m.status === "failed") banner = `<div class="banner bad"><span>${esc(m.error || "Processing failed")}</span><button class="btn" id="retry">Retry</button></div>`;
+  if (m.status === "processing") banner = `<div class="banner warn">Transcribing and writing the minutes. This page updates when they are ready.</div>`;
+  if (m.status === "recording") banner = `<div class="banner bad">Recording in progress.</div>`;
+  const body = activeTab === "minutes" ? (m.notes ? `<div class="md">${md(m.notes)}</div>` : `<div class="empty">No minutes yet.</div>`)
+             : activeTab === "transcript" ? (m.transcript ? transcriptHtml(m.transcript) : `<div class="empty">No transcript yet.</div>`)
+             : `<textarea id="mynotes" style="min-height:320px" placeholder="Your own notes for this meeting...">${esc(m.my_notes || "")}</textarea><div class="save-state" id="mynotes-state"></div>`;
+  $("#detail").innerHTML = `
+    <div class="detail-head"><h1>${esc(m.title || "Teams meeting")}</h1>
+      <div class="m">${when} · ${m.start}${m.end ? "–" + m.end : ""}${m.duration_min != null ? " · " + m.duration_min + " min" : ""}</div></div>
+    <div class="tabs">
+      ${[["minutes", "Minutes & action items"], ["transcript", "Transcript"], ["mynotes", "My notes"]].map(([k, label]) =>
+        `<button class="tab ${activeTab === k ? "on" : ""}" data-tab="${k}">${label}</button>`).join("")}
+    </div>${banner}${body}`;
+  document.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { activeTab = b.dataset.tab; renderDetail(); });
+  const retry = $("#retry");
+  if (retry) retry.onclick = async () => { await api(`/api/meetings/${m.id}/retry`, { method: "POST" }); await load(); openMeeting(m.id); };
+  const ta = $("#mynotes");
+  if (ta) ta.addEventListener("input", () => {
+    const id = m.id, text = ta.value;
+    m.my_notes = text;
+    $("#mynotes-state").textContent = "Saving...";
+    clearTimeout(noteTimer);
+    noteTimer = setTimeout(async () => {
+      const r = await api(`/api/meetings/${id}/my_notes`, { method: "PUT", body: text });
+      const s = $("#mynotes-state"); if (s) s.textContent = r.ok ? "Saved" : "Save failed";
+    }, 600);
+  });
+}
+
+// ---------- data
+async function load() {
+  const r = await api("/api/meetings");
+  meetings = await r.json();
+}
+function refresh() { renderCalendar(); renderList(); renderDayNotes(); }
+async function poll() {
+  const before = JSON.stringify(meetings);
+  await load();
+  if (JSON.stringify(meetings) === before) return;
+  renderCalendar(); renderList();
+  const m = activeId && meetings.find((x) => x.id === activeId);
+  if (m && current && (m.status !== current.status || m.title !== current.title) && document.activeElement?.id !== "mynotes") openMeeting(activeId);
+}
+(async () => {
+  await load();
+  // Open the meeting named in the URL (#<id>), else the latest one.
+  const target = meetings.find((m) => m.id === location.hash.slice(1)) || meetings[meetings.length - 1];
+  if (target) {
+    selected = new Set([target.date]); anchor = target.date;
+    view = parseYmd(target.date); view.setDate(1);
+  }
+  refresh();
+  if (target) openMeeting(target.id);
+  setInterval(poll, 10000);
+})();
+</script>
+</body>
+</html>
