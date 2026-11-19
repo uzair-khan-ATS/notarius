@@ -139,6 +139,8 @@ range, or use the quick ranges: Today, Yesterday, This week, Last 7 days, This m
 **Search** (top bar) finds any word across all minutes, transcripts and your notes.
 
 **Pause** (top bar) does the same as in the tray. **Lock** (padlock) locks the dashboard at once.
+The **moon/sun** button switches between light and dark; until you pick one, Notarius follows your
+Windows setting. The **gear** opens Settings.
 
 ## 5. People and speaker names
 
