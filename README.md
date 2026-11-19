@@ -1,4 +1,4 @@
-﻿<p align="center"><img src="assets/logo.svg" width="96" alt="Notarius logo: a Roman seal with a gold beaded rim; inside a parchment speech bubble, a Roman capital N whose right leg is a pen nib"></p>
+﻿<p align="center"><img src="assets/logo.svg" width="96" alt="Notarius logo: a speech bubble drawn as a Roman wax tablet, with a Roman capital N whose right leg is a pen nib"></p>
 
 <h1 align="center">Notarius</h1>
 
@@ -58,8 +58,13 @@ where you choose your PIN and save your recovery key. After that it works by its
 Notarius**. The tray icon is purple while watching, red while recording, amber while writing
 minutes, and grey when paused.
 
-See **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)** for the full guide and
-**[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for how it works.
+More documentation:
+
+- **[User guide](docs/USER_GUIDE.md)**: install options, PIN and recovery key, the dashboard,
+  languages, privacy, troubleshooting.
+- **[How it works](docs/ARCHITECTURE.md)**: pipeline, encryption, API, configuration, building
+  the `.exe`.
+- **[Roadmap](docs/ROADMAP.md)**: Google Meet, screen-share screenshots, and what comes next.
 
 ## License
 
