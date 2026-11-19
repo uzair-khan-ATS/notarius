@@ -1,5 +1,4 @@
 @echo off
-title notetaker
+rem Starts Meeting Notes in the tray (no console window) and opens the dashboard.
 cd /d "%~dp0"
-uv run --script notetaker.py watch
-pause
+start "" uvw run --gui-script notetaker.py open

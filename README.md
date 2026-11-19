@@ -1,70 +1,90 @@
-# notetaker
+# Meeting Notes (teams-notetaker)
 
-Local note-taker for Microsoft Teams meetings. No bot joins the call. Audio, transcripts and
-notes stay on your machine. The only thing sent out is the transcript text, which goes to your
-own Claude Code (Haiku) to write the minutes.
+A local note-taker for Microsoft Teams on Windows. It starts recording when you join a Teams
+call and writes minutes of meeting with action items when you leave. No bot joins the call.
+Audio, transcripts and voice data stay on your laptop. The only thing sent out is the
+transcript text, which goes to your own Claude Code (Haiku) to write the minutes.
 
-1. **Detects the call.** Teams opens its call-audio stream when you join and holds it until you
-   leave, whether you're muted, unmuted, or have no mic.
-2. **Records two tracks.** Your mic (**Me**) and the call audio from the headset or speaker
-   Teams is using (**Others**).
-3. **Transcribes.** When you leave, faster-whisper transcribes locally on the GPU, falling back
-   to the CPU. Raw audio is deleted afterwards.
-4. **Writes the minutes.** `claude -p --model haiku` writes **Minutes of Meeting** (topics,
-   decisions) and an **Action Items** table (action, owner, due date).
-5. **Dashboard.** A local calendar at <http://127.0.0.1:8765> lists your meetings by day.
-   Pick a day or a range of days to see the meetings, read the minutes and transcript, and keep
-   your own notes per meeting and per day.
+- **Starts on join.** It detects the Teams call audio, so it works whether you're muted or not.
+- **Transcribes locally** with faster-whisper on your GPU, at about 15x real time. Without a
+  GPU it falls back to the CPU.
+- **Labels people.** Voices on the call are separated into Speaker 1, Speaker 2, and so on.
+  Claude suggests names from the conversation. Name a voice once in the dashboard and it's
+  recognized by voice in later meetings.
+- **Writes minutes:** topics, decisions, and an action-items table with owner and due date.
+- **Dashboard** at http://127.0.0.1:8765. A calendar where you pick a day or drag across a
+  range to see every meeting and its open action items. Tick off actions, keep notes per
+  meeting and per day, search everything, copy the minutes, and export to **Word** or **PDF**.
+- **Tray app,** like Docker Desktop. The icon is purple while watching, red while recording,
+  and amber while writing minutes. Right-click it for Open dashboard, the current status, and Quit.
 
-Each meeting lands in `~/Documents/MeetingNotes/<date_time>/`: `notes.md`, `transcript.md`,
-`my_notes.md`, and `meta.json`. Day notes are in `_days/<date>.md`.
+## Install
 
-## Requirements
+Requirements:
 
 - Windows 10/11 and the new Teams desktop app
-- [uv](https://docs.astral.sh/uv/). It installs Python and all dependencies on first run.
-- [Claude Code](https://claude.com/claude-code) CLI, logged in (`claude` on PATH)
-- An NVIDIA GPU is optional. Without one, transcription runs on the CPU, which is slower.
-
-## Run
+- [uv](https://docs.astral.sh/uv/getting-started/installation/)
+- [Claude Code](https://claude.com/claude-code), logged in
+- An NVIDIA GPU is optional but makes transcription much faster.
 
 ```powershell
-git clone https://github.com/uzair-khan-ATS/teams-notetaker; cd teams-notetaker
-uv run --script notetaker.py watch       # or double-click start-notetaker.cmd; leave it running
-uv run --script notetaker.py dashboard   # open the dashboard (watch already serves it)
-uv run --script notetaker.py status      # during a call: confirms Teams is detected
-uv run --script notetaker.py record      # manual start/stop (Teams in a browser, other apps)
-uv run --script notetaker.py process "<meeting folder>"   # redo transcript + minutes
+git clone https://github.com/uzair-khan-ATS/teams-notetaker
+cd teams-notetaker
+uv run --script notetaker.py install
 ```
 
-The first run downloads the GPU libraries (~1.2 GB) and the Whisper model (~1.6 GB) once.
+This adds **Meeting Notes** to the Start menu and Desktop and starts it at every login. Open
+it once now: the first start downloads the speech models (~3 GB, one time) and opens the
+dashboard. After that it runs in the tray and takes notes on its own.
 
-Timing on an RTX 4050 laptop: transcription runs at about 15x real time. A one-hour meeting is
-ready about 4-6 minutes after you leave; Haiku takes about 20 seconds of that. CPU-only takes
-roughly 15-30 minutes.
+To quit, right-click the tray icon (under the **^** next to the clock) and choose **Quit
+Meeting Notes**. To uninstall, run `uv run --script notetaker.py uninstall`. Your notes stay
+in `Documents\MeetingNotes`.
 
-To start automatically at login (minimized), run this from the repo folder:
+<details><summary>Other commands</summary>
 
 ```powershell
-$s = (New-Object -ComObject WScript.Shell).CreateShortcut("$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\notetaker.lnk")
-$s.TargetPath = "$PWD\start-notetaker.cmd"; $s.WorkingDirectory = "$PWD"; $s.WindowStyle = 7; $s.Save()
+uv run --script notetaker.py open        # start the tray app (if needed) and open the dashboard
+uv run --script notetaker.py watch       # same, in a console window with live logs
+uv run --script notetaker.py record      # record now, Ctrl+C to stop (Teams in a browser, etc.)
+uv run --script notetaker.py status      # during a call: is Teams detected?
+uv run --script notetaker.py process "<meeting folder>"   # rewrite the minutes
 ```
 
-## Settings (env vars)
+The log is at `%LOCALAPPDATA%\teams-notetaker\notetaker.log`.
+</details>
+
+## Settings (environment variables)
 
 | var | default | |
 |---|---|---|
-| `NOTETAKER_CLAUDE_MODEL` | `haiku` | model for the minutes |
-| `NOTETAKER_MODEL` | `large-v3-turbo` | Whisper model; `small` is faster and lighter but less accurate |
-| `NOTETAKER_LANG` | auto | force a language, e.g. `en` |
-| `NOTETAKER_DIR` | `~/Documents/MeetingNotes` | output folder |
+| `NOTETAKER_CLAUDE_MODEL` | `haiku` | model that writes the minutes |
+| `NOTETAKER_MODEL` | `large-v3-turbo` | Whisper model; `small` is lighter but less accurate |
+| `NOTETAKER_LANG` | auto | force the spoken language, e.g. `en`, `ur`, `hi` |
+| `NOTETAKER_DIR` | `~/Documents/MeetingNotes` | where meetings are saved |
 | `NOTETAKER_PORT` | `8765` | dashboard port (bound to 127.0.0.1 only) |
-| `NOTETAKER_KEEP_AUDIO` | off | `1` keeps the WAVs |
+| `NOTETAKER_KEEP_AUDIO` | off | `1` keeps the WAV recordings |
+| `NOTETAKER_CLUSTER_THRESHOLD` | `0.5` | speaker separation; higher means fewer speakers |
+| `NOTETAKER_VOICE_MATCH` | `0.5` | how similar a voice must be to be recognized |
+
+## What's in a meeting folder
+
+`Documents\MeetingNotes\<date_time>\`:
+
+| file | contents |
+|---|---|
+| `notes.md` | minutes and action items |
+| `transcript.md` | the transcript |
+| `my_notes.md` | your own notes |
+| `segments.json` | timed transcript lines |
+| `speakers.json` | detected voices |
+| `meta.json` | date and duration |
+
+Recognized voices are stored in `_voices.json`, and day notes in `_days\`.
 
 ## Limits
 
-- Individual remote speakers aren't separated. Everyone else is "Others", and Claude names
-  people only where the conversation makes it clear.
-- Use a headset. On laptop speakers the mic also picks up the others, which produces duplicate text.
+- Use a headset. On laptop speakers the mic also picks up everyone else.
+- Speaker separation works best when people take turns. Heavy cross-talk can merge or split voices.
 - Switching audio devices mid-call isn't followed. The recording stays on the device the call started on.
-- Let people know you're taking notes, and check your company's policy on recording.
+- Let people know you're taking notes, and follow your company's policy on recording.
