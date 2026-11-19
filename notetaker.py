@@ -263,12 +263,15 @@ def _enable_cuda_dlls() -> None:
 def transcribe(meeting_dir: Path, device: str) -> None:
     if device == "cuda":
         _enable_cuda_dlls()
+    import psutil
     from faster_whisper import WhisperModel
 
     meta = json.loads((meeting_dir / "meta.json").read_text(encoding="utf-8"))
     started = dt.datetime.fromisoformat(meta["started"])
+    # CTranslate2 defaults to 4 CPU threads; use every physical core for the CPU fallback.
     model = WhisperModel(WHISPER_MODEL, device=device,
-                         compute_type="float16" if device == "cuda" else "int8")
+                         compute_type="float16" if device == "cuda" else "int8",
+                         cpu_threads=psutil.cpu_count(logical=False) or 4)
     segs = []
     for fname, who in TRACKS.items():
         f = meeting_dir / fname
