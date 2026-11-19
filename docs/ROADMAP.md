@@ -11,6 +11,10 @@
 
 ## Next
 
+- **Its own app window instead of a browser tab.** Opening Notarius shows the dashboard in a
+  window with the Notarius icon and its own taskbar entry, like any Windows app. Options: a native
+  window with the built-in Edge WebView2 (for example pywebview), or Edge's app mode
+  (`msedge --app=...`) as a quick first step.
 - **Google Meet** (Chrome and Edge). Detect a Meet call from the browser's microphone and audio
   streams plus the Meet tab title; a small browser extension is the most reliable option.
 - **Teams on the web and Zoom**, detected the same way.
