@@ -117,8 +117,9 @@ STOP_AFTER_S = 30      # call audio closed this long = call over (survives holds
 MIN_MEETING_S = 60     # shorter recordings (mic tests) are discarded
 MAX_MEETING_S = 4 * 3600
 TRACK_FILES = ("mic.wav", "others.wav")
-SENSITIVE_FILES = ("notes.md", "transcript.md", "segments.json", "speakers.json", "my_notes.md")
-SESSION_IDLE_S = 30 * 60
+SENSITIVE_FILES = ("notes.md", "transcript.md", "segments.json", "speakers.json", "my_notes.md",
+                   "notes.english.md", "notes.roman-urdu.md")
+SESSION_IDLE_S = 5 * 60  # the dashboard locks after 5 minutes without activity
 # Speaker separation runs on the CPU at ~1/6 of real time. If it isn't done this many seconds
 # after transcription, the minutes are written first and updated with names when it finishes.
 QUICK_DIARIZE_WAIT_S = float(os.environ.get("NOTETAKER_DIARIZE_WAIT", "20"))
@@ -504,6 +505,19 @@ def spoken_language() -> str | None:
     if os.environ.get("NOTETAKER_LANG"):
         return os.environ["NOTETAKER_LANG"]
     return SPOKEN_LANGUAGES.get(settings().get("spoken_language", "auto"))
+
+
+def _notes_for(language: str) -> str:
+    """File that keeps a meeting's minutes in one language, for instant switching back."""
+    return "notes." + re.sub(r"[^a-z]+", "-", language.lower()).strip("-") + ".md"
+
+
+def drop_other_languages(meeting_dir: Path) -> None:
+    """Saved language versions go stale when the minutes change for another reason (names)."""
+    for lang in MINUTES_LANGUAGES:
+        p = meeting_dir / _notes_for(lang)
+        p.unlink(missing_ok=True)
+        _enc(p).unlink(missing_ok=True)
 
 
 def minutes_language(meeting_dir: Path | None = None) -> str:
@@ -1268,7 +1282,7 @@ def process(meeting_dir: Path, device: str | None = None) -> bool:
         update_meta(meeting_dir, error="unlock the dashboard to rewrite these minutes")
         return False
     finally:
-        update_meta(meeting_dir, processing=None)
+        update_meta(meeting_dir, processing=None, rewriting=None)
         with _state_lock:
             STATE["processing"] -= 1
 
@@ -1333,7 +1347,7 @@ def meeting_summary(d: Path) -> dict | None:
         "end": f"{started + dt.timedelta(seconds=dur):%H:%M}" if dur else None,
         "duration_min": max(1, round(dur / 60)) if dur else None, "title": title, "summary": summary,
         "status": status, "error": meta.get("error"), "language": minutes_language(d),
-        "speakers_pending": bool(meta.get("speakers_pending")),
+        "speakers_pending": bool(meta.get("speakers_pending")), "rewriting": meta.get("rewriting"),
         "has_my_notes": bool((load_text(d / "my_notes.md") or "").strip()),
         "actions": actions, "topics": topics, "people": people,
         "unnamed_speakers": sum(1 for sp in speakers.values() if not sp.get("name")),
@@ -1584,8 +1598,9 @@ class _Handler(BaseHTTPRequestHandler):
         return host_ok and (not mutating or self.headers.get("X-Notetaker") == "1")
 
     def _session(self) -> str | None:
-        jar = http.cookies.SimpleCookie(self.headers.get("Cookie") or "")
-        return jar["nt_session"].value if "nt_session" in jar else None
+        # The session token lives only in the open page's memory (sent as a header, never a
+        # cookie), so a reload, a new tab or a closed browser asks for the PIN again.
+        return self.headers.get("X-Session") or None
 
     def _authorized(self, q: dict) -> bool:
         if not VAULT.exists():
@@ -1675,7 +1690,7 @@ class _Handler(BaseHTTPRequestHandler):
                 SESSIONS.pop(self._session() or "", None)
                 if not SESSIONS:
                     VAULT.lock()
-            return self._send(200, {"ok": True}, cookie="")
+            return self._send(200, {"ok": True})
         if action == "change":
             if not self._authorized({}):
                 return self._deny()
@@ -1691,7 +1706,7 @@ class _Handler(BaseHTTPRequestHandler):
         tok = secrets.token_urlsafe(32)
         with _auth_lock:
             SESSIONS[tok] = time.time()
-        self._send(200, {"ok": True, **(extra or {})}, cookie=tok)
+        self._send(200, {"ok": True, "session": tok, **(extra or {})})
 
     def do_GET(self):
         if not self._same_origin(False):
@@ -1818,13 +1833,24 @@ class _Handler(BaseHTTPRequestHandler):
                 return self._send(409, {"error": "Wait until the minutes are written."})
             names = self._json_body()
             if rename_speakers(d, {str(k): str(v) for k, v in names.items()}) and has_file(d / "notes.md"):
+                drop_other_languages(d)
                 self._reprocess(d)
             return self._send(202, {"ok": True})
         if api[2] == "rewrite":
             lang = self._json_body().get("language")
             if busy or lang not in MINUTES_LANGUAGES:
                 return self._send(409, {"error": "These minutes can't be rewritten right now."})
+            current = minutes_language(d)
+            if lang == current:
+                return self._send(200, {"ok": True, "cached": True})
+            # Keep each language's version: switching back is instant, no new Claude call.
+            if notes := load_text(d / "notes.md"):
+                save_text(d / _notes_for(current), notes)
             update_meta(d, minutes_language=lang)
+            if cached := load_text(d / _notes_for(lang)):
+                save_text(d / "notes.md", cached)
+                return self._send(200, {"ok": True, "cached": True})
+            update_meta(d, rewriting=lang)
             self._reprocess(d)
             return self._send(202, {"ok": True})
         return self._send(404, {"error": "not found"})
@@ -1832,6 +1858,28 @@ class _Handler(BaseHTTPRequestHandler):
     def _reprocess(self, d: Path) -> None:
         update_meta(d, processing=True)
         threading.Thread(target=process, args=(d,), daemon=True).start()
+
+
+def lock_dashboard(reason: str) -> None:
+    with _auth_lock:
+        had = bool(SESSIONS) or VAULT.is_unlocked
+        SESSIONS.clear()
+        VAULT.lock()
+    if had:
+        log(f"dashboard locked ({reason})")
+
+
+def _lock_with_windows() -> None:
+    """Lock the dashboard whenever Windows shows its lock or sign-in screen (Win+L, sleep, switch user)."""
+    import psutil
+
+    while True:
+        time.sleep(5)
+        try:
+            if any(p.info["name"] == "LogonUI.exe" for p in psutil.process_iter(["name"])):
+                lock_dashboard("Windows was locked")
+        except Exception:
+            pass
 
 
 def start_dashboard(block: bool) -> bool:
@@ -1843,6 +1891,7 @@ def start_dashboard(block: bool) -> bool:
             webbrowser.open(DASHBOARD_URL)
         return False
     log(f"dashboard: {DASHBOARD_URL}")
+    threading.Thread(target=_lock_with_windows, daemon=True).start()
     if block:
         webbrowser.open(DASHBOARD_URL)
         try:
@@ -1955,14 +2004,17 @@ LOGO_N = [  # a Roman inscription capital: slim verticals, heavy diagonal, serif
     [(12.5, 15), (26, 15), (26, 18.5), (12.5, 18.5)],                             # top-left serif
     [(17, 15), (27, 15), (47.5, 41), (39.5, 41)],                                 # heavy diagonal
     [(37.5, 15), (51.5, 15), (51.5, 18.5), (37.5, 18.5)],                         # top-right serif
-    [(42, 17), (47, 17), (47, 35), (48.6, 41), (44.5, 51.5), (40.4, 41), (42, 35)],  # leg -> pen nib
+    [(42, 17), (47, 17), (47, 26), (55, 36), (44.5, 59), (34, 36), (42, 26)],  # leg -> big fountain-pen nib
 ]
+LOGO_NIB = {"tip": (44.5, 59), "slit_top": (44.5, 42), "hole": (44.5, 40), "hole_r": 3.2, "slit_w": 2.4}
 
 
-# The N sits inside a speech bubble: a conversation, written down by the scribe's pen.
-LOGO_BUBBLE = (9, 9, 55, 47, 10)                     # x0, y0, x1, y1, corner radius
-LOGO_TAIL = [(15, 44), (27, 44), (12, 56)]
-LOGO_N_FIT = (0.66, 18.6, 15.2)                      # scale, x offset, y offset for the N inside
+# A Roman seal: beaded gold rim (like a denarius), imperial purple field, a parchment speech
+# bubble (the conversation), and the Roman N whose right leg is the scribe's pen nib.
+LOGO_GOLD, LOGO_BEAD, LOGO_PARCHMENT, LOGO_PURPLE = "#c9a227", "#8f6f16", "#f4e8c8", "#5b1a3a"
+LOGO_BUBBLE = (14, 15, 50, 44, 8)                    # x0, y0, x1, y1, corner radius
+LOGO_TAIL = [(19, 42), (28, 42), (16, 51)]
+LOGO_N_FIT = (0.57, 19.9, 17.6)                      # scale, x offset, y offset for the N inside
 
 
 def _logo_n_point(x: float, y: float) -> tuple[float, float]:
@@ -1970,41 +2022,53 @@ def _logo_n_point(x: float, y: float) -> tuple[float, float]:
     return ox + (x - 12.5) * k, oy + (y - 15) * k
 
 
-def icon_image(color: str = "#4f46e5", size: int = 64):
+def _logo_beads() -> list[tuple[float, float]]:
+    import math
+
+    return [(32 + 28.2 * math.cos(math.radians(a)), 32 + 28.2 * math.sin(math.radians(a))) for a in range(0, 360, 12)]
+
+
+def icon_image(color: str = LOGO_PURPLE, size: int = 64):
     from PIL import Image, ImageDraw
 
     big = size * 4  # draw large and downsample for smooth edges
     s = big / 64
     img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle((4 * s, 4 * s, 60 * s, 60 * s), radius=14 * s, fill=color)
+    d.ellipse((2 * s, 2 * s, 62 * s, 62 * s), fill=LOGO_GOLD)                 # gold rim
+    if size >= 48:
+        for bx, by in _logo_beads():                                         # beading, as on a coin
+            d.ellipse(((bx - 0.9) * s, (by - 0.9) * s, (bx + 0.9) * s, (by + 0.9) * s), fill=LOGO_BEAD)
+    d.ellipse((5.5 * s, 5.5 * s, 58.5 * s, 58.5 * s), fill=color)          # field (status colour)
     x0, y0, x1, y1, r = LOGO_BUBBLE
-    d.rounded_rectangle((x0 * s, y0 * s, x1 * s, y1 * s), radius=r * s, fill="white")
-    d.polygon([(x * s, y * s) for x, y in LOGO_TAIL], fill="white")
+    d.rounded_rectangle((x0 * s, y0 * s, x1 * s, y1 * s), radius=r * s, fill=LOGO_PARCHMENT)
+    d.polygon([(x * s, y * s) for x, y in LOGO_TAIL], fill=LOGO_PARCHMENT)
     for poly in LOGO_N:
         d.polygon([tuple(c * s for c in _logo_n_point(x, y)) for x, y in poly], fill=color)
     k = LOGO_N_FIT[0]
-    (sx, sy), (_, ey), (hx, hy) = _logo_n_point(44.5, 51.5), _logo_n_point(44.5, 42.5), _logo_n_point(44.5, 41.5)
-    d.line([(sx * s, sy * s), (sx * s, ey * s)], fill="white", width=max(1, round(1.3 * k * s)))  # nib slit
-    rr = 1.6 * k
-    d.ellipse(((hx - rr) * s, (hy - rr) * s, (hx + rr) * s, (hy + rr) * s), fill="white")  # breather hole
+    (sx, sy), (_, ey), (hx, hy) = (_logo_n_point(*LOGO_NIB[key]) for key in ("tip", "slit_top", "hole"))
+    d.line([(sx * s, sy * s), (sx * s, ey * s)], fill=LOGO_PARCHMENT, width=max(1, round(LOGO_NIB["slit_w"] * k * s)))
+    rr = LOGO_NIB["hole_r"] * k
+    d.ellipse(((hx - rr) * s, (hy - rr) * s, (hx + rr) * s, (hy + rr) * s), fill=LOGO_PARCHMENT)
     return img.resize((size, size), Image.LANCZOS)
 
 
-def logo_svg(color: str = "#4f46e5") -> str:
+def logo_svg(color: str = LOGO_PURPLE) -> str:
     """The same mark as SVG (dashboard, favicon, docs)."""
     x0, y0, x1, y1, r = LOGO_BUBBLE
     pts = lambda poly: " ".join(f"{px:.2f},{py:.2f}" for px, py in (_logo_n_point(x, y) for x, y in poly))
     n = "".join(f'<polygon points="{pts(p)}"/>' for p in LOGO_N)
-    (sx, sy), (_, ey), (hx, hy) = _logo_n_point(44.5, 51.5), _logo_n_point(44.5, 42.5), _logo_n_point(44.5, 41.5)
+    beads = "".join(f'<circle cx="{bx:.2f}" cy="{by:.2f}" r="0.9"/>' for bx, by in _logo_beads())
+    (sx, sy), (_, ey), (hx, hy) = (_logo_n_point(*LOGO_NIB[key]) for key in ("tip", "slit_top", "hole"))
     k = LOGO_N_FIT[0]
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
-            f'<rect x="4" y="4" width="56" height="56" rx="14" fill="{color}"/>'
-            f'<rect x="{x0}" y="{y0}" width="{x1 - x0}" height="{y1 - y0}" rx="{r}" fill="#fff"/>'
-            f'<polygon points="{" ".join(f"{x},{y}" for x, y in LOGO_TAIL)}" fill="#fff"/>'
+            f'<circle cx="32" cy="32" r="30" fill="{LOGO_GOLD}"/><g fill="{LOGO_BEAD}">{beads}</g>'
+            f'<circle cx="32" cy="32" r="26.5" fill="{color}"/>'
+            f'<rect x="{x0}" y="{y0}" width="{x1 - x0}" height="{y1 - y0}" rx="{r}" fill="{LOGO_PARCHMENT}"/>'
+            f'<polygon points="{" ".join(f"{x},{y}" for x, y in LOGO_TAIL)}" fill="{LOGO_PARCHMENT}"/>'
             f'<g fill="{color}">{n}</g>'
-            f'<path d="M{sx:.2f} {sy:.2f}V{ey:.2f}" stroke="#fff" stroke-width="{1.3 * k:.2f}"/>'
-            f'<circle cx="{hx:.2f}" cy="{hy:.2f}" r="{1.6 * k:.2f}" fill="#fff"/></svg>')
+            f'<path d="M{sx:.2f} {sy:.2f}V{ey:.2f}" stroke="{LOGO_PARCHMENT}" stroke-width="{LOGO_NIB["slit_w"] * k:.2f}"/>'
+            f'<circle cx="{hx:.2f}" cy="{hy:.2f}" r="{LOGO_NIB["hole_r"] * k:.2f}" fill="{LOGO_PARCHMENT}"/></svg>')
 
 
 def save_icon(path: Path) -> Path:
@@ -2022,7 +2086,7 @@ def cmd_tray(open_browser: bool) -> None:
     global _on_minutes_ready
     import pystray
 
-    colors = {"idle": "#4f46e5", "recording": "#dc2626", "processing": "#d97706", "paused": "#98a2b3"}
+    colors = {"idle": LOGO_PURPLE, "recording": "#c0262d", "processing": "#c26a06", "paused": "#7d8590"}
     images = {k: icon_image(c) for k, c in colors.items()}
     stop = threading.Event()
 

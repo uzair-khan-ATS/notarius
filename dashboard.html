@@ -9,7 +9,7 @@
 :root {
   --bg: #f4f5f7; --panel: #ffffff; --text: #1f2328; --muted: #667085; --faint: #98a2b3;
   --line: #e4e7ec; --line-strong: #d0d5dd; --hover: #f2f4f7;
-  --accent: #4f46e5; --accent-hover: #4338ca; --accent-soft: #eef2ff; --accent-line: #c7d2fe;
+  --accent: #7a2350; --accent-hover: #5b1a3a; --accent-soft: #f8eef3; --accent-line: #e9c9d8; --gold: #b8901c;
   --ok: #067647; --ok-soft: #ecfdf3; --warn: #b54708; --warn-soft: #fffaeb;
   --bad: #b42318; --bad-soft: #fef3f2; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
   --radius: 12px;
@@ -27,7 +27,8 @@ button { cursor: pointer; }
 .top { position: sticky; top: 0; z-index: 5; height: 60px; background: var(--panel); border-bottom: 1px solid var(--line);
        display: flex; align-items: center; gap: 16px; padding: 0 20px; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 16px; white-space: nowrap; }
-.brand svg { width: 28px; height: 28px; }
+.brand svg { width: 30px; height: 30px; }
+.brand .word { font-family: "Cinzel", "Trajan Pro", "Times New Roman", Georgia, serif; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; font-size: 17px; color: #4a1530; }
 .state { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted);
          background: var(--hover); border-radius: 999px; padding: 4px 12px; white-space: nowrap; }
 .state .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
@@ -198,6 +199,7 @@ textarea.notes { width: 100%; min-height: 160px; resize: vertical; border: 1px s
 .dialog.wide { width: min(520px, 100%); }
 .dialog .logo { width: 44px; height: 44px; margin-bottom: 14px; }
 .dialog h2 { margin: 0 0 6px; font-size: 20px; }
+.dialog .logo { width: 52px; height: 52px; }
 .dialog p { color: var(--muted); margin: 0 0 18px; }
 .field { display: block; margin-bottom: 14px; }
 .field span { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
@@ -265,8 +267,8 @@ body.print .pmeta { color: var(--muted); margin-bottom: 14px; }
 <body>
 <header class="top" id="top">
   <div class="brand">
-    <svg viewBox="0 0 64 64" aria-hidden="true"><rect x="4" y="4" width="56" height="56" rx="14" fill="#4f46e5"/><rect x="9" y="9" width="46" height="38" rx="10" fill="#fff"/><polygon points="15,44 27,44 12,56" fill="#fff"/><g fill="#4f46e5"><polygon points="21.57,16.52 24.87,16.52 24.87,36.32 21.57,36.32"/><polygon points="18.60,35.33 27.84,35.33 27.84,37.64 18.60,37.64"/><polygon points="18.60,15.20 27.51,15.20 27.51,17.51 18.60,17.51"/><polygon points="21.57,15.20 28.17,15.20 41.70,32.36 36.42,32.36"/><polygon points="35.10,15.20 44.34,15.20 44.34,17.51 35.10,17.51"/><polygon points="38.07,16.52 41.37,16.52 41.37,28.40 42.43,32.36 39.72,39.29 37.01,32.36 38.07,28.40"/></g><path d="M39.72 39.29V33.35" stroke="#fff" stroke-width="0.86"/><circle cx="39.72" cy="32.69" r="1.06" fill="#fff"/></svg>
-    Notarius
+    <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="30" fill="#c9a227"/><g fill="#8f6f16"><circle cx="60.20" cy="32.00" r="0.9"/><circle cx="59.58" cy="37.86" r="0.9"/><circle cx="57.76" cy="43.47" r="0.9"/><circle cx="54.81" cy="48.58" r="0.9"/><circle cx="50.87" cy="52.96" r="0.9"/><circle cx="46.10" cy="56.42" r="0.9"/><circle cx="40.71" cy="58.82" r="0.9"/><circle cx="34.95" cy="60.05" r="0.9"/><circle cx="29.05" cy="60.05" r="0.9"/><circle cx="23.29" cy="58.82" r="0.9"/><circle cx="17.90" cy="56.42" r="0.9"/><circle cx="13.13" cy="52.96" r="0.9"/><circle cx="9.19" cy="48.58" r="0.9"/><circle cx="6.24" cy="43.47" r="0.9"/><circle cx="4.42" cy="37.86" r="0.9"/><circle cx="3.80" cy="32.00" r="0.9"/><circle cx="4.42" cy="26.14" r="0.9"/><circle cx="6.24" cy="20.53" r="0.9"/><circle cx="9.19" cy="15.42" r="0.9"/><circle cx="13.13" cy="11.04" r="0.9"/><circle cx="17.90" cy="7.58" r="0.9"/><circle cx="23.29" cy="5.18" r="0.9"/><circle cx="29.05" cy="3.95" r="0.9"/><circle cx="34.95" cy="3.95" r="0.9"/><circle cx="40.71" cy="5.18" r="0.9"/><circle cx="46.10" cy="7.58" r="0.9"/><circle cx="50.87" cy="11.04" r="0.9"/><circle cx="54.81" cy="15.42" r="0.9"/><circle cx="57.76" cy="20.53" r="0.9"/><circle cx="59.58" cy="26.14" r="0.9"/></g><circle cx="32" cy="32" r="26.5" fill="#5b1a3a"/><rect x="14" y="15" width="36" height="29" rx="8" fill="#f4e8c8"/><polygon points="19,42 28,42 16,51" fill="#f4e8c8"/><g fill="#5b1a3a"><polygon points="22.46,18.74 25.31,18.74 25.31,35.84 22.46,35.84"/><polygon points="19.90,34.98 27.88,34.98 27.88,36.98 19.90,36.98"/><polygon points="19.90,17.60 27.59,17.60 27.59,19.60 19.90,19.60"/><polygon points="22.46,17.60 28.16,17.60 39.85,32.42 35.29,32.42"/><polygon points="34.15,17.60 42.13,17.60 42.13,19.60 34.15,19.60"/><polygon points="36.71,18.74 39.56,18.74 39.56,23.87 44.12,29.57 38.14,42.68 32.16,29.57 36.71,23.87"/></g><path d="M38.14 42.68V32.99" stroke="#f4e8c8" stroke-width="1.37"/><circle cx="38.14" cy="31.85" r="1.82" fill="#f4e8c8"/></svg>
+    <span class="word">Notarius</span>
   </div>
   <div class="state off" id="state"><span class="dot"></span><span id="state-text">Connecting...</span></div>
   <label class="search">
@@ -288,7 +290,7 @@ body.print .pmeta { color: var(--muted); margin-bottom: 14px; }
 
 <div class="overlay" id="auth" hidden>
   <form class="dialog" id="auth-form" autocomplete="off">
-    <svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><rect x="4" y="4" width="56" height="56" rx="14" fill="#4f46e5"/><rect x="9" y="9" width="46" height="38" rx="10" fill="#fff"/><polygon points="15,44 27,44 12,56" fill="#fff"/><g fill="#4f46e5"><polygon points="21.57,16.52 24.87,16.52 24.87,36.32 21.57,36.32"/><polygon points="18.60,35.33 27.84,35.33 27.84,37.64 18.60,37.64"/><polygon points="18.60,15.20 27.51,15.20 27.51,17.51 18.60,17.51"/><polygon points="21.57,15.20 28.17,15.20 41.70,32.36 36.42,32.36"/><polygon points="35.10,15.20 44.34,15.20 44.34,17.51 35.10,17.51"/><polygon points="38.07,16.52 41.37,16.52 41.37,28.40 42.43,32.36 39.72,39.29 37.01,32.36 38.07,28.40"/></g><path d="M39.72 39.29V33.35" stroke="#fff" stroke-width="0.86"/><circle cx="39.72" cy="32.69" r="1.06" fill="#fff"/></svg>
+    <svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="30" fill="#c9a227"/><g fill="#8f6f16"><circle cx="60.20" cy="32.00" r="0.9"/><circle cx="59.58" cy="37.86" r="0.9"/><circle cx="57.76" cy="43.47" r="0.9"/><circle cx="54.81" cy="48.58" r="0.9"/><circle cx="50.87" cy="52.96" r="0.9"/><circle cx="46.10" cy="56.42" r="0.9"/><circle cx="40.71" cy="58.82" r="0.9"/><circle cx="34.95" cy="60.05" r="0.9"/><circle cx="29.05" cy="60.05" r="0.9"/><circle cx="23.29" cy="58.82" r="0.9"/><circle cx="17.90" cy="56.42" r="0.9"/><circle cx="13.13" cy="52.96" r="0.9"/><circle cx="9.19" cy="48.58" r="0.9"/><circle cx="6.24" cy="43.47" r="0.9"/><circle cx="4.42" cy="37.86" r="0.9"/><circle cx="3.80" cy="32.00" r="0.9"/><circle cx="4.42" cy="26.14" r="0.9"/><circle cx="6.24" cy="20.53" r="0.9"/><circle cx="9.19" cy="15.42" r="0.9"/><circle cx="13.13" cy="11.04" r="0.9"/><circle cx="17.90" cy="7.58" r="0.9"/><circle cx="23.29" cy="5.18" r="0.9"/><circle cx="29.05" cy="3.95" r="0.9"/><circle cx="34.95" cy="3.95" r="0.9"/><circle cx="40.71" cy="5.18" r="0.9"/><circle cx="46.10" cy="7.58" r="0.9"/><circle cx="50.87" cy="11.04" r="0.9"/><circle cx="54.81" cy="15.42" r="0.9"/><circle cx="57.76" cy="20.53" r="0.9"/><circle cx="59.58" cy="26.14" r="0.9"/></g><circle cx="32" cy="32" r="26.5" fill="#5b1a3a"/><rect x="14" y="15" width="36" height="29" rx="8" fill="#f4e8c8"/><polygon points="19,42 28,42 16,51" fill="#f4e8c8"/><g fill="#5b1a3a"><polygon points="22.46,18.74 25.31,18.74 25.31,35.84 22.46,35.84"/><polygon points="19.90,34.98 27.88,34.98 27.88,36.98 19.90,36.98"/><polygon points="19.90,17.60 27.59,17.60 27.59,19.60 19.90,19.60"/><polygon points="22.46,17.60 28.16,17.60 39.85,32.42 35.29,32.42"/><polygon points="34.15,17.60 42.13,17.60 42.13,19.60 34.15,19.60"/><polygon points="36.71,18.74 39.56,18.74 39.56,23.87 44.12,29.57 38.14,42.68 32.16,29.57 36.71,23.87"/></g><path d="M38.14 42.68V32.99" stroke="#f4e8c8" stroke-width="1.37"/><circle cx="38.14" cy="31.85" r="1.82" fill="#f4e8c8"/></svg>
     <h2 id="auth-title">Notarius is locked</h2>
     <p id="auth-sub">Enter your password to see your meetings.</p>
     <div class="lockstate" id="lock-state" hidden></div>
@@ -381,8 +383,10 @@ const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate(
 const parseYmd = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const PRINT_TOKEN = new URLSearchParams(location.search).get("pt");
+let SESSION = null;  // lives only in this page: a reload or a new tab asks for the PIN again
 async function api(path, opts = {}) {
-  const headers = { "X-Notetaker": "1", ...(PRINT_TOKEN ? { "X-Print-Token": PRINT_TOKEN } : {}), ...(opts.headers || {}) };
+  const headers = { "X-Notetaker": "1", ...(PRINT_TOKEN ? { "X-Print-Token": PRINT_TOKEN } : {}),
+                    ...(SESSION ? { "X-Session": SESSION } : {}), ...(opts.headers || {}) };
   const r = await fetch(path, { ...opts, headers, credentials: "same-origin" });
   if (r.status === 401 && !path.startsWith("/api/auth") && !PRINT_TOKEN) {
     const j = await r.clone().json().catch(() => ({}));
@@ -664,7 +668,8 @@ function renderMeeting() {
       <div class="tools">${m.notes ? `<button class="btn" id="copy">${ICON.copy} Copy minutes</button>` : ""}
         ${m.notes ? exportButtons([m.id]) : ""}</div></div>`;
   if (m.status === "failed") html += `<div class="banner bad"><span>${esc(m.error || "Processing failed")}</span><button class="btn" id="retry">Try again</button></div>`;
-  if (m.status === "processing") html += `<div class="banner warn">Transcribing and writing the minutes. This page updates by itself.</div>`;
+  if (m.status === "processing") html += `<div class="banner warn">${m.rewriting ? `Writing the minutes in ${esc(m.rewriting)} from the transcript you already have`
+    : m.transcript ? "Writing the minutes from the transcript" : "Transcribing and writing the minutes"}. This page updates by itself.</div>`;
   if (m.status === "recording") html += `<div class="banner bad">This call is being recorded right now. Minutes appear a minute or two after you leave.</div>`;
 
   const nameable = (m.speakers || []).filter((p) => p.nameable);
@@ -715,8 +720,9 @@ function wireMeeting(m) {
   document.querySelectorAll("[data-lang]").forEach((b) => b.onclick = async () => {
     if (b.classList.contains("on")) return;
     const r = await api(`/api/meetings/${m.id}/rewrite`, { method: "POST", body: JSON.stringify({ language: b.dataset.lang }) });
-    if (r.ok) { toast(`Rewriting the minutes in ${b.dataset.lang}...`); await refreshData(true); }
-    else toast((await r.json()).error || "Couldn't rewrite the minutes");
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) { toast(j.cached ? `Switched to ${b.dataset.lang}.` : `Writing the minutes in ${b.dataset.lang}. This takes a few seconds.`); await refreshData(true); }
+    else toast(j.error || "Couldn't rewrite the minutes");
   });
   const inputs = [...document.querySelectorAll("[data-speaker]")], save = $("#save-names");
   const dirty = () => inputs.some((i) => i.value.trim() !== i.dataset.orig);
@@ -865,7 +871,9 @@ $("#rec-go").onclick = async () => {
   const pin = $("#rec-pin").value;
   if (!/^\d{4}$/.test(pin)) { $("#rec-err").textContent = "The new PIN must be 4 digits."; return; }
   const r = await api("/api/auth/recover", { method: "POST", body: JSON.stringify({ recovery_key: $("#rec-key").value, new_password: pin }) });
-  if (!r.ok) { $("#rec-err").textContent = (await r.json().catch(() => ({}))).error || "That didn't work."; return; }
+  const jr = await r.json().catch(() => ({}));
+  if (!r.ok) { $("#rec-err").textContent = jr.error || "That didn't work."; return; }
+  SESSION = jr.session || null;
   $("#rec-key").value = ""; $("#rec-pin").value = ""; showRecover(false);
   unlocked(false);
   toast("PIN reset. You can create a new recovery key in Settings.");
@@ -920,6 +928,7 @@ async function submitPin() {
   pinBusy = false;
   const j = await r.json().catch(() => ({}));
   if (!r.ok) return pinError(j.error || "That didn't work.");
+  SESSION = j.session || null;
   if (j.recovery_key) { authInfo.has_recovery = true; showRecoveryKey(j.recovery_key, () => unlocked(true)); return; }
   unlocked(false);
 }
@@ -950,7 +959,23 @@ pinInputs.forEach((inp, k) => {
   inp.addEventListener("focus", () => inp.select());
 });
 $("#auth-form").addEventListener("submit", (e) => { e.preventDefault(); submitPin(); });
-$("#lock").onclick = async () => { await api("/api/auth/logout", { method: "POST" }); showAuth(false); };
+async function lockNow() {
+  if (!SESSION) return;
+  await api("/api/auth/logout", { method: "POST" }).catch(() => {});
+  SESSION = null; S.meeting = null; $("#main").innerHTML = "";
+  ["#settings", "#rk-screen", "#tour"].forEach((s) => { $(s).hidden = true; });
+  showAuth(false);
+}
+$("#lock").onclick = lockNow;
+// Lock when you leave the tab for over a minute, or after 5 minutes without activity.
+const AWAY_MS = 60 * 1000, IDLE_MS = 5 * 60 * 1000;
+let hiddenAt = null, lastActive = Date.now();
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) hiddenAt = Date.now();
+  else { if (hiddenAt && Date.now() - hiddenAt > AWAY_MS) lockNow(); hiddenAt = null; lastActive = Date.now(); }
+});
+["pointerdown", "keydown", "wheel", "pointermove"].forEach((ev) => addEventListener(ev, () => { lastActive = Date.now(); }, { passive: true }));
+setInterval(() => { if (SESSION && Date.now() - lastActive > IDLE_MS) lockNow(); }, 10000);
 $("#pause").onclick = async () => {
   const paused = !(S.status && S.status.paused);
   if (paused && S.status && S.status.recording && !confirm("Pause now? The call being recorded will be stopped and not saved.")) return;

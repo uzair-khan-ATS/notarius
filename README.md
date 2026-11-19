@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/logo.svg" width="96" alt="Notarius logo: a Roman letter N with a pen nib, inside a speech bubble"></p>
+﻿<p align="center"><img src="assets/logo.svg" width="96" alt="Notarius logo: a Roman seal with a gold beaded rim; inside a parchment speech bubble, a Roman capital N whose right leg is a pen nib"></p>
 
 <h1 align="center">Notarius</h1>
 
