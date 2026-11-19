@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Meeting Notes</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='4' y='4' width='56' height='56' rx='14' fill='%234f46e5'/%3E%3Crect x='16' y='16' width='32' height='6' rx='3' fill='white'/%3E%3Crect x='16' y='29' width='32' height='6' rx='3' fill='white'/%3E%3Crect x='16' y='42' width='22' height='6' rx='3' fill='white'/%3E%3C/svg%3E">
+<title>Notarius</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"%3E%3Crect x="4" y="4" width="56" height="56" rx="14" fill="%234f46e5"/%3E%3Cg fill="%23fff"%3E%3Cpath d="M17 17h5v30h-5z"/%3E%3Cpath d="M12.5 45.5h14v3.5h-14z"/%3E%3Cpath d="M12.5 15h13.5v3.5h-13.5z"/%3E%3Cpath d="M17 15h10l20.5 26h-8z"/%3E%3Cpath d="M37.5 15h14v3.5h-14z"/%3E%3Cpath d="M42 17h5v18l1.6 6-4.1 10.5-4.1-10.5 1.6-6z"/%3E%3C/g%3E%3Cpath d="M44.5 51.5v-9" stroke="%234f46e5" stroke-width="1.3"/%3E%3Ccircle cx="44.5" cy="41.5" r="1.6" fill="%234f46e5"/%3E%3C/svg%3E">
 <style>
 :root {
   --bg: #f4f5f7; --panel: #ffffff; --text: #1f2328; --muted: #667085; --faint: #98a2b3;
@@ -15,6 +15,7 @@
   --radius: 12px;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 body { background: var(--bg); color: var(--text); font: 14px/1.55 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
 button, input, textarea { font: inherit; color: inherit; }
@@ -173,6 +174,67 @@ textarea.notes { width: 100%; min-height: 160px; resize: vertical; border: 1px s
 .results .res .s { color: var(--muted); font-size: 13px; margin-top: 3px; }
 .results mark { background: #fef08a; border-radius: 3px; padding: 0 1px; }
 
+.top-actions { display: flex; gap: 6px; }
+.top-btn { height: 38px; min-width: 38px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--panel);
+           display: inline-flex; align-items: center; gap: 6px; font-weight: 550; font-size: 13px; }
+.top-btn:hover { background: var(--hover); }
+.top-btn svg { width: 17px; height: 17px; }
+.top-btn.paused { background: var(--warn-soft); border-color: #fedf89; color: var(--warn); }
+.state.paused { background: var(--warn-soft); color: var(--warn); }
+.state.paused .dot { background: var(--warn); }
+.mtg .summary { color: var(--text); font-size: 13.5px; margin-top: 6px; line-height: 1.5; }
+.mtg .read { color: var(--accent); font-size: 12.5px; font-weight: 600; margin-top: 8px; display: inline-block; }
+.lede { font-size: 15px; line-height: 1.6; background: var(--accent-soft); border: 1px solid var(--accent-line); border-radius: 10px; padding: 12px 14px; margin: 4px 0 8px; }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 9px; overflow: hidden; }
+.seg button { border: 0; background: var(--panel); padding: 6px 12px; font-size: 13px; font-weight: 550; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--line-strong); }
+.seg button.on { background: var(--accent-soft); color: var(--accent); }
+.doc-bar { display: flex; align-items: center; gap: 10px; justify-content: flex-end; margin-bottom: 10px; font-size: 13px; color: var(--muted); }
+
+/* auth + settings overlays */
+.overlay { position: fixed; inset: 0; z-index: 20; background: var(--bg); display: grid; place-items: center; padding: 16px; }
+.overlay.modal { background: rgba(16,24,40,.45); }
+.dialog { width: min(420px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 20px 40px rgba(16,24,40,.15); padding: 28px; }
+.dialog.wide { width: min(520px, 100%); }
+.dialog .logo { width: 44px; height: 44px; margin-bottom: 14px; }
+.dialog h2 { margin: 0 0 6px; font-size: 20px; }
+.dialog p { color: var(--muted); margin: 0 0 18px; }
+.field { display: block; margin-bottom: 14px; }
+.field span { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.field input, .field select { width: 100%; height: 40px; border: 1px solid var(--line-strong); border-radius: 9px; padding: 0 12px; background: var(--panel); }
+.field small { display: block; color: var(--muted); font-size: 12px; margin-top: 5px; }
+.dialog .btn { height: 40px; }
+.dialog .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+.warnbox { background: var(--warn-soft); color: var(--warn); border-radius: 9px; padding: 10px 12px; font-size: 13px; margin-bottom: 16px; }
+.err { color: var(--bad); font-size: 13px; min-height: 20px; margin: -4px 0 8px; }
+.dialog hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
+.pin { display: flex; gap: 12px; justify-content: center; margin: 6px 0 12px; }
+.pin input { width: 58px; height: 66px; text-align: center; font-size: 28px; font-weight: 650; border: 1.5px solid var(--line-strong);
+             border-radius: 12px; background: var(--panel); caret-color: var(--accent); }
+.pin input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.pin.shake { animation: shake .35s; }
+.lockstate { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; color: var(--muted); background: var(--hover); border-radius: 999px; padding: 6px 12px; margin: -6px auto 16px; width: fit-content; }
+.lockstate .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+.lockstate.rec { background: var(--bad-soft); color: var(--bad); font-weight: 600; }
+.lockstate.rec .dot { background: var(--bad); animation: pulse 1.2s infinite; }
+.about { font-size: 12.5px; color: var(--faint); margin: 14px 0 0; text-align: center; }
+.linkbtn { border: 0; background: none; color: var(--accent); font-weight: 600; padding: 0; font-size: 13px; }
+.linkbtn:hover { text-decoration: underline; }
+.center { text-align: center; }
+.rk { font: 600 20px/1.4 ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing: .06em; text-align: center;
+      background: var(--hover); border: 1px dashed var(--line-strong); border-radius: 10px; padding: 14px; margin: 6px 0 12px; user-select: all; }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; margin: 12px 0 4px; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--accent); flex: none; }
+.tour-spot { position: fixed; z-index: 30; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(16,24,40,.55); transition: all .25s ease; pointer-events: none; }
+.tour-card { position: fixed; z-index: 31; width: min(340px, calc(100vw - 32px)); background: var(--panel); border-radius: 14px; padding: 18px;
+             box-shadow: 0 16px 40px rgba(16,24,40,.25); transition: top .25s ease, left .25s ease; }
+.tour-card h3 { margin: 0 0 6px; font-size: 16px; }
+.tour-card p { margin: 0 0 14px; color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+.tour-foot { display: flex; align-items: center; gap: 8px; }
+.tour-foot .count { color: var(--faint); font-size: 12px; margin-right: auto; }
+.tour-foot .btn { height: 32px; padding: 0 12px; }
+@keyframes shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+
 .toast { position: fixed; right: 20px; bottom: 20px; background: #1f2328; color: #fff; padding: 10px 14px; border-radius: 10px;
          font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.18); opacity: 0; transform: translateY(8px); transition: .2s; pointer-events: none; z-index: 10; }
 .toast.show { opacity: 1; transform: none; }
@@ -203,8 +265,8 @@ body.print .pmeta { color: var(--muted); margin-bottom: 14px; }
 <body>
 <header class="top" id="top">
   <div class="brand">
-    <svg viewBox="0 0 64 64" aria-hidden="true"><rect x="4" y="4" width="56" height="56" rx="14" fill="#4f46e5"/><rect x="16" y="16" width="32" height="6" rx="3" fill="#fff"/><rect x="16" y="29" width="32" height="6" rx="3" fill="#fff"/><rect x="16" y="42" width="22" height="6" rx="3" fill="#fff"/></svg>
-    Meeting Notes
+    <svg viewBox="0 0 64 64" aria-hidden="true"><rect x="4" y="4" width="56" height="56" rx="14" fill="#4f46e5"/><rect x="9" y="9" width="46" height="38" rx="10" fill="#fff"/><polygon points="15,44 27,44 12,56" fill="#fff"/><g fill="#4f46e5"><polygon points="21.57,16.52 24.87,16.52 24.87,36.32 21.57,36.32"/><polygon points="18.60,35.33 27.84,35.33 27.84,37.64 18.60,37.64"/><polygon points="18.60,15.20 27.51,15.20 27.51,17.51 18.60,17.51"/><polygon points="21.57,15.20 28.17,15.20 41.70,32.36 36.42,32.36"/><polygon points="35.10,15.20 44.34,15.20 44.34,17.51 35.10,17.51"/><polygon points="38.07,16.52 41.37,16.52 41.37,28.40 42.43,32.36 39.72,39.29 37.01,32.36 38.07,28.40"/></g><path d="M39.72 39.29V33.35" stroke="#fff" stroke-width="0.86"/><circle cx="39.72" cy="32.69" r="1.06" fill="#fff"/></svg>
+    Notarius
   </div>
   <div class="state off" id="state"><span class="dot"></span><span id="state-text">Connecting...</span></div>
   <label class="search">
@@ -212,7 +274,80 @@ body.print .pmeta { color: var(--muted); margin-bottom: 14px; }
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="6"/><path d="m14 14 4 4"/></svg>
     <input id="q" type="search" placeholder="Search all meetings, notes and transcripts" autocomplete="off">
   </label>
+  <div class="top-actions">
+    <button class="top-btn" id="tour-btn" title="Take the tour" aria-label="Take the tour">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="7.5"/><path d="M7.8 7.6a2.3 2.3 0 1 1 3.2 2.1c-.6.3-1 .8-1 1.4v.6"/><circle cx="10" cy="14.4" r=".6" fill="currentColor"/></svg></button>
+    <button class="top-btn" id="pause" title="Pause note-taking (a call in progress is stopped and not saved)">
+      <svg viewBox="0 0 20 20" fill="currentColor"><rect x="5" y="4" width="3.5" height="12" rx="1"/><rect x="11.5" y="4" width="3.5" height="12" rx="1"/></svg><span>Pause</span></button>
+    <button class="top-btn" id="open-settings" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="2.6"/><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4"/></svg></button>
+    <button class="top-btn" id="lock" title="Lock the dashboard" aria-label="Lock">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="9" width="12" height="8.5" rx="2"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9"/></svg></button>
+  </div>
 </header>
+
+<div class="overlay" id="auth" hidden>
+  <form class="dialog" id="auth-form" autocomplete="off">
+    <svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><rect x="4" y="4" width="56" height="56" rx="14" fill="#4f46e5"/><rect x="9" y="9" width="46" height="38" rx="10" fill="#fff"/><polygon points="15,44 27,44 12,56" fill="#fff"/><g fill="#4f46e5"><polygon points="21.57,16.52 24.87,16.52 24.87,36.32 21.57,36.32"/><polygon points="18.60,35.33 27.84,35.33 27.84,37.64 18.60,37.64"/><polygon points="18.60,15.20 27.51,15.20 27.51,17.51 18.60,17.51"/><polygon points="21.57,15.20 28.17,15.20 41.70,32.36 36.42,32.36"/><polygon points="35.10,15.20 44.34,15.20 44.34,17.51 35.10,17.51"/><polygon points="38.07,16.52 41.37,16.52 41.37,28.40 42.43,32.36 39.72,39.29 37.01,32.36 38.07,28.40"/></g><path d="M39.72 39.29V33.35" stroke="#fff" stroke-width="0.86"/><circle cx="39.72" cy="32.69" r="1.06" fill="#fff"/></svg>
+    <h2 id="auth-title">Notarius is locked</h2>
+    <p id="auth-sub">Enter your password to see your meetings.</p>
+    <div class="lockstate" id="lock-state" hidden></div>
+    <div class="warnbox" id="auth-warn" hidden>Your notes and transcripts are encrypted with this PIN on this Windows account. If you forget it, they can't be recovered.</div>
+    <div class="pin" id="pin" role="group" aria-label="4-digit PIN">
+      <input type="password" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="PIN digit 1">
+      <input type="password" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="PIN digit 2">
+      <input type="password" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="PIN digit 3">
+      <input type="password" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="PIN digit 4">
+    </div>
+    <div class="err" id="auth-err" role="alert" style="text-align:center"></div>
+    <div class="center" id="forgot-wrap" hidden><button type="button" class="linkbtn" id="forgot">Forgot your PIN?</button></div>
+    <div id="recover" hidden>
+      <label class="field"><span>Recovery key</span><input id="rec-key" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"></label>
+      <label class="field"><span>New 4-digit PIN</span><input id="rec-pin" type="password" inputmode="numeric" maxlength="4" autocomplete="off"></label>
+      <div class="err" id="rec-err" role="alert"></div>
+      <button type="button" class="btn primary" style="width:100%" id="rec-go">Reset PIN and unlock</button>
+      <div class="center" style="margin-top:12px"><button type="button" class="linkbtn" id="rec-back">Back to PIN</button></div>
+    </div>
+    <p class="about">Named after the <i>notarii</i>, the scribes of ancient Rome who wrote down every word said in a meeting.</p>
+  </form>
+</div>
+
+<div class="overlay" id="rk-screen" hidden>
+  <div class="dialog">
+    <h2>Save your recovery key</h2>
+    <p>If you ever forget your PIN, this key is the only way back into your notes. <b>Write it down on paper</b> or save it in a password manager, and keep it somewhere safe. It won't be shown again.</p>
+    <div class="rk" id="rk-code"></div>
+    <div class="row" style="justify-content:center;margin:0">
+      <button type="button" class="btn" id="rk-copy">Copy</button>
+      <button type="button" class="btn" id="rk-download">Download as text file</button>
+    </div>
+    <label class="check"><input type="checkbox" id="rk-ok"><span>I've written down my recovery key and put it somewhere safe.</span></label>
+    <button type="button" class="btn primary" style="width:100%;margin-top:10px" id="rk-done" disabled>Continue</button>
+  </div>
+</div>
+
+<div class="overlay modal" id="settings" hidden>
+  <form class="dialog wide" id="settings-form" autocomplete="off">
+    <h2>Settings</h2>
+    <p>These apply to new meetings. To change the language of a meeting you already have, open it and switch the minutes language there.</p>
+    <label class="field"><span>Your name</span><input id="set-name" placeholder="Shown instead of “Me”" maxlength="40"></label>
+    <label class="field"><span>Language people speak in calls</span>
+      <select id="set-spoken"><option value="auto">Detect automatically</option><option value="en">English</option><option value="ur">Urdu</option><option value="hi">Hindi</option></select>
+      <small>Choose Urdu or Hindi if most of your calls are in that language and detection gets it wrong. Mixed English-Urdu calls usually work best with automatic detection.</small></label>
+    <label class="field"><span>Write minutes in</span>
+      <select id="set-minutes"><option>English</option><option>Roman Urdu</option></select></label>
+    <hr>
+    <b style="font-size:14px">Change PIN</b>
+    <label class="field" style="margin-top:10px"><span>Current PIN</span><input type="password" id="set-old" inputmode="numeric" maxlength="4" autocomplete="off"></label>
+    <label class="field"><span>New PIN</span><input type="password" id="set-new" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="4 digits"></label>
+    <hr>
+    <b style="font-size:14px">Recovery key</b>
+    <p style="margin:6px 0 10px;font-size:13px">Resets a forgotten PIN. Creating a new one makes the old one stop working.</p>
+    <button class="btn" type="button" id="new-rk">Create a new recovery key</button>
+    <div class="err" id="set-err" role="alert" style="margin-top:12px"></div>
+    <div class="row"><button class="btn" type="button" id="settings-cancel">Cancel</button><button class="btn primary" type="submit">Save</button></div>
+  </form>
+</div>
 
 <div class="layout" id="layout">
   <aside class="card side" aria-label="Calendar">
@@ -236,6 +371,7 @@ body.print .pmeta { color: var(--muted); margin-bottom: 14px; }
   <main id="main"></main>
 </div>
 <div class="toast" id="toast" role="status"></div>
+<div id="tour" hidden><div class="tour-spot" id="tour-spot"></div><div class="tour-card" id="tour-card" role="dialog" aria-live="polite"></div></div>
 
 <script>
 // ===================================================================== helpers
@@ -244,7 +380,16 @@ const pad = (n) => String(n).padStart(2, "0");
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const parseYmd = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const api = (path, opts = {}) => fetch(path, { ...opts, headers: { "X-Notetaker": "1", ...(opts.headers || {}) } });
+const PRINT_TOKEN = new URLSearchParams(location.search).get("pt");
+async function api(path, opts = {}) {
+  const headers = { "X-Notetaker": "1", ...(PRINT_TOKEN ? { "X-Print-Token": PRINT_TOKEN } : {}), ...(opts.headers || {}) };
+  const r = await fetch(path, { ...opts, headers, credentials: "same-origin" });
+  if (r.status === 401 && !path.startsWith("/api/auth") && !PRINT_TOKEN) {
+    const j = await r.clone().json().catch(() => ({}));
+    showAuth(j.auth === "setup");
+  }
+  return r;
+}
 const fmtDay = (s, opts = { weekday: "long", day: "numeric", month: "long", year: "numeric" }) => parseYmd(s).toLocaleDateString(undefined, opts);
 const fmtShort = (s) => fmtDay(s, { weekday: "short", day: "numeric", month: "short" });
 const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
@@ -296,7 +441,7 @@ function md(src) {
 }
 // Minutes body without the title line and the action-items table (both shown separately).
 function minutesBody(notes) {
-  return notes.replace(/^# .*\n?/m, "").replace(/\n## Action Items[\s\S]*?(?=\n## |\s*$)/, "\n");
+  return notes.replace(/^# .*\n?/m, "").replace(/^\*\*Summary:\*\*.*\n?/m, "").replace(/\n## Action Items[\s\S]*?(?=\n## |\s*$)/, "\n");
 }
 
 // ===================================================================== state
@@ -318,13 +463,17 @@ function renderStatus() {
   const el = $("#state"), st = S.status;
   el.className = "state";
   if (!st) { el.classList.add("off"); $("#state-text").textContent = "Not connected"; return; }
+  const pb = $("#pause");
+  pb.classList.toggle("paused", !!st.paused);
+  pb.querySelector("span").textContent = st.paused ? "Resume" : "Pause";
+  if (st.paused) { el.classList.add("paused"); $("#state-text").textContent = "Paused: not taking notes"; return; }
   if (st.recording) {
     el.classList.add("rec");
     const secs = Math.max(0, Math.round((Date.now() - new Date(st.since).getTime()) / 1000));
     $("#state-text").textContent = `Recording Teams call · ${Math.floor(secs / 60)}:${pad(secs % 60)}`;
   } else if (st.processing) { el.classList.add("busy"); $("#state-text").textContent = "Writing minutes..."; }
   else if (st.watching) { $("#state-text").textContent = "Watching for Teams calls"; }
-  else { el.classList.add("off"); $("#state-text").textContent = "Not recording calls (open Meeting Notes from the Start menu)"; }
+  else { el.classList.add("off"); $("#state-text").textContent = "Not recording calls (open Notarius from the Start menu)"; }
 }
 
 // ===================================================================== calendar
@@ -443,7 +592,7 @@ function renderOverview() {
   html += `<div class="section"><h2>Meetings <span class="n">${ms.length}</span></h2>`;
   if (!ms.length) {
     html += `<div class="card empty"><b>No meetings ${days.length === 1 ? "on this day" : "in these days"}</b>
-      Minutes are taken automatically when you join a Teams call while Meeting Notes is running.</div>`;
+      Minutes are taken automatically when you join a Teams call while Notarius is running.</div>`;
   }
   for (const m of ms) {
     const done = m.actions.filter((a) => a.done).length;
@@ -455,7 +604,9 @@ function renderOverview() {
       <div><div class="time">${m.start}</div><div class="dur">${m.duration_min ? m.duration_min + " min" : ""}</div></div>
       <div style="min-width:0"><div class="title">${esc(m.title || (m.status === "ready" ? "Teams meeting" : "Teams call"))}</div>
         <div class="meta">${days.length > 1 ? `<span>${fmtShort(m.date)}</span>` : ""}${m.people.length ? `<span>With ${esc(m.people.join(", "))}</span>` : ""}${m.unnamed_speakers ? `<span>${plural(m.unnamed_speakers, "unnamed speaker")}</span>` : ""}${m.has_my_notes ? "<span>Has your notes</span>" : ""}</div>
-        ${m.topics.length ? `<div class="topics">${esc(m.topics.slice(0, 4).join(" · "))}</div>` : ""}</div>
+        ${m.summary ? `<div class="summary">${inline(esc(m.summary))}</div>` : ""}
+        ${m.topics.length ? `<div class="topics">Topics: ${esc(m.topics.slice(0, 5).join(" · "))}</div>` : ""}
+        ${m.status === "ready" ? `<span class="read">Read minutes and transcript &rarr;</span>` : ""}</div>
       <div class="right">${pill}</div></button>`;
   }
   html += `</div>`;
@@ -484,7 +635,7 @@ async function loadDayNotes(day) {
     clearTimeout(dayTimer);
     dayTimer = setTimeout(async () => {
       const ok = (await api(`/api/days/${day}`, { method: "PUT", body: ta.value })).ok;
-      const st = $("#daynotes-state"); if (st) st.textContent = ok ? "Saved" : "Couldn't save. Is Meeting Notes running?";
+      const st = $("#daynotes-state"); if (st) st.textContent = ok ? "Saved" : "Couldn't save. Is Notarius running?";
     }, 500);
   };
 }
@@ -511,7 +662,7 @@ function renderMeeting() {
     <div class="page-head"><div><h1>${esc(m.title || "Teams meeting")}</h1>
       <div class="sub">${esc(fmtDay(m.date))} · ${m.start}${m.end ? "–" + m.end : ""}${m.duration_min ? " · " + m.duration_min + " min" : ""}</div></div>
       <div class="tools">${m.notes ? `<button class="btn" id="copy">${ICON.copy} Copy minutes</button>` : ""}
-        ${m.notes ? exportButtons([m.id]) : ""}<button class="btn" id="folder" title="Open the meeting's folder">${ICON.folder}</button></div></div>`;
+        ${m.notes ? exportButtons([m.id]) : ""}</div></div>`;
   if (m.status === "failed") html += `<div class="banner bad"><span>${esc(m.error || "Processing failed")}</span><button class="btn" id="retry">Try again</button></div>`;
   if (m.status === "processing") html += `<div class="banner warn">Transcribing and writing the minutes. This page updates by itself.</div>`;
   if (m.status === "recording") html += `<div class="banner bad">This call is being recorded right now. Minutes appear a minute or two after you leave.</div>`;
@@ -534,7 +685,14 @@ function renderMeeting() {
   const acts = m.actions || [];
   const tabs = [["minutes", "Minutes"], ["actions", `Action items${acts.length ? ` (${acts.filter((a) => !a.done).length})` : ""}`], ["transcript", "Transcript"], ["mynotes", "My notes"]];
   html += `<div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab ${S.tab === k ? "on" : ""}" role="tab" aria-selected="${S.tab === k}" data-tab="${k}">${l}</button>`).join("")}</div>`;
-  if (S.tab === "minutes") html += m.notes ? `<div class="card doc md">${md(minutesBody(m.notes))}</div>` : `<div class="card empty"><b>No minutes yet</b>They're written a minute or two after the call ends.</div>`;
+  if (S.tab === "minutes") {
+    const langs = (S.settings && S.settings.minutes_languages) || ["English", "Roman Urdu"];
+    const busy = m.status === "processing" || m.status === "recording";
+    html += m.notes ? `<div class="doc-bar">Minutes language <div class="seg" role="group" aria-label="Minutes language">${langs.map((l) =>
+      `<button type="button" data-lang="${esc(l)}" class="${m.language === l ? "on" : ""}" ${busy ? "disabled" : ""}>${esc(l)}</button>`).join("")}</div></div>
+      <div class="card doc md">${m.summary ? `<div class="lede">${inline(esc(m.summary))}</div>` : ""}${md(minutesBody(m.notes))}</div>`
+      : `<div class="card empty"><b>No minutes yet</b>They're written a minute or two after the call ends.</div>`;
+  }
   if (S.tab === "actions") html += acts.length ? `<div class="card actions">${acts.map((a) => actionRow(m, a, false)).join("")}</div>` : `<div class="card empty"><b>No action items</b>Nothing was assigned in this meeting.</div>`;
   if (S.tab === "transcript") html += m.transcript ? `<div class="card tr">${transcriptHtml(m)}</div>` : `<div class="card empty"><b>No transcript yet</b></div>`;
   if (S.tab === "mynotes") html += `<label class="sr" for="mynotes">My notes</label><textarea class="notes" id="mynotes" style="min-height:320px" placeholder="Your own notes for this meeting. They're saved automatically and included in exports.">${esc(m.my_notes || "")}</textarea><div class="save-state" id="mynotes-state"></div>`;
@@ -553,8 +711,13 @@ function wireMeeting(m) {
   $("#back").onclick = () => { S.meetingId = null; S.meeting = null; history.replaceState(null, "", location.pathname); renderMain(); };
   document.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { S.tab = b.dataset.tab; renderMeeting(); });
   const copy = $("#copy"); if (copy) copy.onclick = async () => { await navigator.clipboard.writeText(m.notes); toast("Minutes copied. Paste them into Teams, Outlook or Word."); };
-  $("#folder").onclick = () => api(`/api/meetings/${m.id}/open-folder`, { method: "POST" });
   const retry = $("#retry"); if (retry) retry.onclick = async () => { await api(`/api/meetings/${m.id}/retry`, { method: "POST" }); toast("Trying again..."); await refreshData(true); };
+  document.querySelectorAll("[data-lang]").forEach((b) => b.onclick = async () => {
+    if (b.classList.contains("on")) return;
+    const r = await api(`/api/meetings/${m.id}/rewrite`, { method: "POST", body: JSON.stringify({ language: b.dataset.lang }) });
+    if (r.ok) { toast(`Rewriting the minutes in ${b.dataset.lang}...`); await refreshData(true); }
+    else toast((await r.json()).error || "Couldn't rewrite the minutes");
+  });
   const inputs = [...document.querySelectorAll("[data-speaker]")], save = $("#save-names");
   const dirty = () => inputs.some((i) => i.value.trim() !== i.dataset.orig);
   inputs.forEach((i) => { i.oninput = () => { save.disabled = !dirty(); }; i.onkeydown = (e) => { if (e.key === "Enter" && dirty()) save.click(); }; });
@@ -574,7 +737,7 @@ function wireMeeting(m) {
     clearTimeout(noteTimer);
     noteTimer = setTimeout(async () => {
       const ok = (await api(`/api/meetings/${m.id}/my_notes`, { method: "PUT", body: ta.value })).ok;
-      const st = $("#mynotes-state"); if (st) st.textContent = ok ? "Saved" : "Couldn't save. Is Meeting Notes running?";
+      const st = $("#mynotes-state"); if (st) st.textContent = ok ? "Saved" : "Couldn't save. Is Notarius running?";
     }, 500);
   };
 }
@@ -626,7 +789,7 @@ async function exportFile(kind, ids) {
   const r = await api(`/api/export.${kind}?ids=${encodeURIComponent(ids)}`);
   if (!r.ok) {
     if (kind === "pdf") { const w = window.open(`/print?ids=${encodeURIComponent(ids)}&dialog=1`); if (w) return; }
-    return toast("Export failed. Is Meeting Notes running?");
+    return toast("Export failed. Is Notarius running?");
   }
   const cd = r.headers.get("Content-Disposition") || "";
   const name = decodeURIComponent((cd.match(/filename\*=UTF-8''([^;]+)/) || [])[1] || `minutes.${kind}`);
@@ -675,9 +838,212 @@ async function renderPrint() {
   if (params.get("dialog")) setTimeout(() => window.print(), 300);
 }
 
+// ===================================================================== auth, settings, pause, lock
+let pinStage = "login", firstPin = "", pinBusy = false, booted = false;
+const pinInputs = [...document.querySelectorAll("#pin input")];
+const pinValue = () => pinInputs.map((i) => i.value).join("");
+function clearPin() { pinInputs.forEach((i) => { i.value = ""; }); pinInputs[0].focus(); }
+function setAuthText() {
+  const t = { login: ["Notarius is locked", "Enter your 4-digit PIN."],
+              setup1: ["Protect your notes", "Choose a 4-digit PIN. You'll enter it to open your meetings."],
+              setup2: ["Confirm your PIN", "Enter the same 4 digits again."] }[pinStage];
+  $("#auth-title").textContent = t[0]; $("#auth-sub").textContent = t[1];
+  $("#auth-warn").hidden = pinStage === "login";
+  $("#forgot-wrap").hidden = !(pinStage === "login" && authInfo.has_recovery);
+}
+let authInfo = {};
+function showRecover(on) {
+  $("#recover").hidden = !on; $("#pin").hidden = on; $("#forgot-wrap").hidden = on || !authInfo.has_recovery;
+  $("#auth-err").textContent = ""; $("#rec-err").textContent = "";
+  $("#auth-title").textContent = on ? "Reset your PIN" : "Notarius is locked";
+  $("#auth-sub").textContent = on ? "Enter the recovery key you saved when you set your PIN, then choose a new PIN." : "Enter your 4-digit PIN.";
+  setTimeout(() => (on ? $("#rec-key") : pinInputs[0]).focus(), 50);
+}
+$("#forgot").onclick = () => showRecover(true);
+$("#rec-back").onclick = () => showRecover(false);
+$("#rec-go").onclick = async () => {
+  const pin = $("#rec-pin").value;
+  if (!/^\d{4}$/.test(pin)) { $("#rec-err").textContent = "The new PIN must be 4 digits."; return; }
+  const r = await api("/api/auth/recover", { method: "POST", body: JSON.stringify({ recovery_key: $("#rec-key").value, new_password: pin }) });
+  if (!r.ok) { $("#rec-err").textContent = (await r.json().catch(() => ({}))).error || "That didn't work."; return; }
+  $("#rec-key").value = ""; $("#rec-pin").value = ""; showRecover(false);
+  unlocked(false);
+  toast("PIN reset. You can create a new recovery key in Settings.");
+};
+function showRecoveryKey(code, then) {
+  $("#rk-code").textContent = code; $("#rk-ok").checked = false; $("#rk-done").disabled = true;
+  $("#rk-screen").hidden = false;
+  $("#rk-ok").onchange = () => { $("#rk-done").disabled = !$("#rk-ok").checked; };
+  $("#rk-copy").onclick = async () => { await navigator.clipboard.writeText(code); toast("Recovery key copied. Paste it into your password manager."); };
+  $("#rk-download").onclick = () => {
+    const blob = new Blob([`Notarius recovery key\r\n\r\n${code}\r\n\r\nUse it to reset your PIN if you forget it. Keep it somewhere safe.\r\n`], { type: "text/plain" });
+    const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: "Notarius recovery key.txt" });
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+  $("#rk-done").onclick = () => { $("#rk-screen").hidden = true; $("#rk-code").textContent = ""; if (then) then(); };
+}
+let lockTimer = null;
+async function refreshLockState() {
+  if ($("#auth").hidden) { clearInterval(lockTimer); lockTimer = null; return; }
+  try {
+    const st = await (await fetch("/api/status", { headers: { "X-Notetaker": "1" } })).json();
+    const el = $("#lock-state"); el.hidden = pinStage !== "login";
+    el.className = "lockstate" + (st.recording ? " rec" : "");
+    el.innerHTML = '<span class="dot"></span>' + esc(st.paused ? "Paused: not taking notes" : st.recording ? "Recording a Teams call (notes are saved while locked)"
+      : st.processing ? "Writing minutes..." : st.watching ? "Watching for Teams calls, even while locked" : "Not watching for calls");
+  } catch (e) { $("#lock-state").hidden = true; }
+}
+function showAuth(setup) {
+  if (!lockTimer) lockTimer = setInterval(refreshLockState, 3000);
+  setTimeout(refreshLockState, 50);
+  pinStage = setup ? "setup1" : "login"; firstPin = "";
+  $("#auth").hidden = false; $("#auth-err").textContent = "";
+  $("#recover").hidden = true; $("#pin").hidden = false;
+  setAuthText();
+  document.querySelectorAll(".top, .layout").forEach((e) => e.setAttribute("inert", ""));
+  pinInputs.forEach((i) => { i.value = ""; });
+  setTimeout(() => pinInputs[0].focus(), 50);
+}
+function pinError(msg) {
+  $("#auth-err").textContent = msg;
+  const g = $("#pin"); g.classList.remove("shake"); void g.offsetWidth; g.classList.add("shake");
+  clearPin();
+}
+async function submitPin() {
+  const pin = pinValue();
+  if (pinBusy || !/^\d{4}$/.test(pin)) return;
+  $("#auth-err").textContent = "";
+  if (pinStage === "setup1") { firstPin = pin; pinStage = "setup2"; setAuthText(); clearPin(); return; }
+  if (pinStage === "setup2" && pin !== firstPin) { pinStage = "setup1"; setAuthText(); return pinError("Those PINs didn't match. Choose your PIN again."); }
+  pinBusy = true;
+  const r = await api(`/api/auth/${pinStage === "login" ? "login" : "setup"}`, { method: "POST", body: JSON.stringify({ password: pin }) });
+  pinBusy = false;
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) return pinError(j.error || "That didn't work.");
+  if (j.recovery_key) { authInfo.has_recovery = true; showRecoveryKey(j.recovery_key, () => unlocked(true)); return; }
+  unlocked(false);
+}
+function unlocked(firstTime) {
+  $("#auth").hidden = true;
+  document.querySelectorAll(".top, .layout").forEach((el) => el.removeAttribute("inert"));
+  if (firstTime) toast("PIN set. Your notes are now encrypted on this laptop.");
+  if (!booted) boot(); else refreshData(true);
+}
+pinInputs.forEach((inp, k) => {
+  inp.addEventListener("input", () => {
+    inp.value = inp.value.replace(/\D/g, "").slice(-1);
+    if (inp.value && k < 3) pinInputs[k + 1].focus();
+    if (pinValue().length === 4) submitPin();
+  });
+  inp.addEventListener("keydown", (e) => {
+    if (e.key === "Backspace" && !inp.value && k > 0) { e.preventDefault(); pinInputs[k - 1].value = ""; pinInputs[k - 1].focus(); }
+    if (e.key === "ArrowLeft" && k > 0) pinInputs[k - 1].focus();
+    if (e.key === "ArrowRight" && k < 3) pinInputs[k + 1].focus();
+  });
+  inp.addEventListener("paste", (e) => {
+    const d = (e.clipboardData.getData("text") || "").replace(/\D/g, "").slice(0, 4);
+    if (!d) return;
+    e.preventDefault();
+    pinInputs.forEach((i, j) => { i.value = d[j] || ""; });
+    if (d.length === 4) submitPin(); else pinInputs[d.length].focus();
+  });
+  inp.addEventListener("focus", () => inp.select());
+});
+$("#auth-form").addEventListener("submit", (e) => { e.preventDefault(); submitPin(); });
+$("#lock").onclick = async () => { await api("/api/auth/logout", { method: "POST" }); showAuth(false); };
+$("#pause").onclick = async () => {
+  const paused = !(S.status && S.status.paused);
+  if (paused && S.status && S.status.recording && !confirm("Pause now? The call being recorded will be stopped and not saved.")) return;
+  const r = await api("/api/pause", { method: "POST", body: JSON.stringify({ paused }) });
+  if (r.ok) { toast(paused ? "Paused. Calls won't be recorded until you resume." : "Resumed. Teams calls will be recorded."); refreshData(false); }
+};
+async function loadSettings() { const r = await api("/api/settings"); if (r.ok) S.settings = await r.json(); }
+$("#open-settings").onclick = async () => {
+  await loadSettings(); const s = S.settings || {};
+  $("#set-name").value = s.my_name || ""; $("#set-spoken").value = s.spoken_language || "auto"; $("#set-minutes").value = s.minutes_language || "English";
+  $("#set-old").value = ""; $("#set-new").value = ""; $("#set-err").textContent = "";
+  $("#settings").hidden = false; $("#set-name").focus();
+};
+$("#settings-cancel").onclick = () => { $("#settings").hidden = true; };
+$("#new-rk").onclick = async () => {
+  if (!confirm("Create a new recovery key? The old one will stop working.")) return;
+  const r = await api("/api/auth/recovery-key", { method: "POST" });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.recovery_key) { $("#set-err").textContent = j.error || "Couldn't create a recovery key."; return; }
+  $("#settings").hidden = true; showRecoveryKey(j.recovery_key);
+};
+$("#settings").addEventListener("click", (e) => { if (e.target.id === "settings") $("#settings").hidden = true; });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("#settings").hidden = true; });
+$("#settings-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if ($("#set-new").value || $("#set-old").value) {
+    const r = await api("/api/auth/change", { method: "POST", body: JSON.stringify({ password: $("#set-old").value, new_password: $("#set-new").value }) });
+    if (!r.ok) { $("#set-err").textContent = (await r.json().catch(() => ({}))).error || "Couldn't change the password."; return; }
+  }
+  const r = await api("/api/settings", { method: "PUT", body: JSON.stringify({ my_name: $("#set-name").value, spoken_language: $("#set-spoken").value, minutes_language: $("#set-minutes").value }) });
+  if (!r.ok) { $("#set-err").textContent = "Couldn't save the settings."; return; }
+  $("#settings").hidden = true; toast("Settings saved."); await loadSettings(); refreshData(true);
+});
+
+// ===================================================================== guided tour
+const TOUR = [
+  { sel: ".brand", title: "Welcome to Notarius", text: "Named after the notarii, the scribes of ancient Rome who wrote down every word of a meeting. Notarius records your Teams calls on this laptop and writes the minutes when you leave. No bot joins the call." },
+  { sel: "#state", title: "It listens for Teams", text: "When you join a Teams call this turns red and recording starts on its own, muted or not. A minute or two after you leave, the minutes appear here." },
+  { sel: ".side", title: "Your meetings, by day", text: "Days with meetings show a count. Click a day, or drag across several days to see them together." },
+  { sel: "#ranges", title: "Quick ranges", text: "Jump to today, this week, the last 7 days, or everything." },
+  { sel: "#main", title: "Meetings and action items", text: "Each meeting shows a short summary. Open one for the full minutes, the transcript, who spoke, and your own notes. Tick off action items as you finish them, and export to Word or PDF." },
+  { sel: ".search", title: "Search everything", text: "Find any word across all minutes, transcripts and your notes." },
+  { sel: "#pause", title: "Pause when needed", text: "Pause before a call you don't want recorded. A call already being recorded is stopped and not saved." },
+  { sel: "#open-settings", title: "Settings", text: "Your name, the language people speak (English, Urdu, Hindi, or automatic for mixed calls), English or Roman Urdu minutes, your PIN and your recovery key." },
+  { sel: "#lock", title: "Lock", text: "Locks the dashboard. Your notes and transcripts stay encrypted on this laptop." },
+  { sel: "#tour-btn", title: "That's the tour", text: "Click this button any time to see it again." },
+];
+let tourStep = 0;
+function placeTour() {
+  const step = TOUR[tourStep], el = $(step.sel), spot = $("#tour-spot"), card = $("#tour-card");
+  if (!el) return;
+  el.scrollIntoView({ block: "nearest" });
+  const r = el.getBoundingClientRect(), pad = 6;
+  Object.assign(spot.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + 2 * pad}px`, height: `${Math.min(r.height, innerHeight - 40) + 2 * pad}px` });
+  card.innerHTML = `<h3>${esc(step.title)}</h3><p>${esc(step.text)}</p><div class="tour-foot"><span class="count">${tourStep + 1} of ${TOUR.length}</span>`
+    + (tourStep ? '<button class="btn" id="tour-back">Back</button>' : '<button class="btn" id="tour-skip">Skip</button>')
+    + `<button class="btn primary" id="tour-next">${tourStep === TOUR.length - 1 ? "Done" : "Next"}</button></div>`;
+  const cw = card.offsetWidth, ch = card.offsetHeight, vw = innerWidth, vh = innerHeight;
+  let top = r.bottom + 14, left = Math.min(Math.max(16, r.left), vw - cw - 16);
+  if (top + ch > vh - 16) top = r.top - ch - 14;
+  if (top < 16) {
+    top = Math.max(16, Math.min(vh - ch - 16, r.top + 20));
+    left = r.right + 14 + cw < vw ? r.right + 14 : Math.max(16, Math.min(vw - cw - 16, r.left + 20));
+  }
+  Object.assign(card.style, { top: `${top}px`, left: `${left}px` });
+  const back = $("#tour-back"), skip = $("#tour-skip");
+  if (back) back.onclick = () => { tourStep--; placeTour(); };
+  if (skip) skip.onclick = endTour;
+  $("#tour-next").onclick = () => { if (tourStep === TOUR.length - 1) endTour(); else { tourStep++; placeTour(); } };
+  $("#tour-next").focus();
+}
+function startTour() { tourStep = 0; $("#tour").hidden = false; placeTour(); }
+function endTour() { $("#tour").hidden = true; try { localStorage.setItem("notarius.tour", "done"); } catch (e) {} }
+$("#tour-btn").onclick = startTour;
+addEventListener("resize", () => { if (!$("#tour").hidden) placeTour(); });
+document.addEventListener("keydown", (e) => {
+  if ($("#tour").hidden) return;
+  if (e.key === "Escape") endTour();
+  if (e.key === "ArrowRight" && tourStep < TOUR.length - 1) { tourStep++; placeTour(); }
+  if (e.key === "ArrowLeft" && tourStep > 0) { tourStep--; placeTour(); }
+});
+
 // ===================================================================== boot
 (async () => {
   if (location.pathname === "/print") return renderPrint();
+  const a = await (await api("/api/auth")).json().catch(() => ({ setup: false, unlocked: false }));
+  authInfo = a;
+  if (!a.unlocked) return showAuth(a.setup);
+  boot();
+})();
+async function boot() {
+  booted = true;
+  await loadSettings();
   await refreshData(true);
   const target = S.meetings.find((m) => m.id === location.hash.slice(1));
   if (target) { await openMeeting(target.id); }
@@ -689,9 +1055,11 @@ async function renderPrint() {
     }
     renderCalendar(); renderOverview();
   }
+  let seen = null; try { seen = localStorage.getItem("notarius.tour"); } catch (e) {}
+  if (!seen) setTimeout(startTour, 700);
   setInterval(() => { renderStatus(); }, 1000);
-  setInterval(() => refreshData(false), 4000);
-})();
+  setInterval(() => { if ($("#auth").hidden) refreshData(false); }, 4000);
+}
 </script>
 </body>
 </html>
