@@ -14,15 +14,18 @@
 #   "pillow",
 #   "python-docx>=1.1",
 #   "cryptography>=42",
+#   "pywebview>=6.2,<7",  # the app window (Edge WebView2, built into Windows)
 # ]
 # ///
 """Notarius: a local Teams meeting note-taker for Windows.
 
     uv run --script notarius.py install   # one time: Start-menu, Desktop and login shortcuts
-    uv run --script notarius.py open      # tray app + dashboard (what the shortcuts run)
+    uv run --script notarius.py open      # tray app + the Notarius window (what the shortcuts run)
+    uv run --script notarius.py window    # just the window (the tray app opens it)
     uv run --script notarius.py watch     # same watcher, in a console window
     uv run --script notarius.py record    # record now, Ctrl+C to stop (browser meetings etc.)
     uv run --script notarius.py process DIR   # (re)write the minutes for a meeting
+    uv run --script notarius.py uninstall # remove shortcuts and the Settings > Apps entry
 
 Records two tracks -- your mic and what your headset/speakers play -- when you join a Teams
 call, transcribes them locally with faster-whisper, separates and recognizes the other
@@ -61,6 +64,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 APP_NAME = "Notarius"
+VERSION = "1.1.0"  # shown in Settings > Apps and on Notarius.exe; build-exe.py reads it from here
+PUBLISHER = "Uzair Khan"
+# Windows groups taskbar buttons, pins and notifications by this ID; the shortcuts carry it too.
+APP_ID = "Notarius.MeetingNotes"
 
 
 def _app_dir() -> Path:
@@ -93,6 +100,8 @@ CLAUDE_MODEL = os.environ.get("NOTETAKER_CLAUDE_MODEL", "haiku")  # small + chea
 DASHBOARD_PORT = int(os.environ.get("NOTETAKER_PORT", "8765"))
 DASHBOARD_URL = f"http://127.0.0.1:{DASHBOARD_PORT}/"
 DASHBOARD_HTML = Path(__file__).with_name("dashboard.html")
+WINDOW_FILE = APP_DIR / "window.json"  # the app window's last size
+WEBVIEW_DIR = APP_DIR / "webview"      # the window's browser profile (theme, tour; no notes)
 
 # Speaker separation + voice memory (sherpa-onnx, CPU, no account needed).
 SEG_MODEL_URL = ("https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/"
@@ -162,6 +171,18 @@ def _redirect_std_streams_if_windowless() -> None:
         _log_fh = _log_fh or open(LOG_FILE, "a", encoding="utf-8", buffering=1)
         sys.stdout = sys.stdout or _log_fh
         sys.stderr = sys.stderr or _log_fh
+
+
+def console_visible() -> bool:
+    """A console window the user can see (`watch`, or a command typed in a terminal). Started from
+    a shortcut, Notarius runs in a hidden console (uvw), which counts as none."""
+    try:
+        k32, u32 = ctypes.windll.kernel32, ctypes.windll.user32
+        k32.GetConsoleWindow.restype = ctypes.c_void_p
+        hwnd = k32.GetConsoleWindow()
+        return bool(hwnd) and bool(u32.IsWindowVisible(ctypes.c_void_p(hwnd)))
+    except Exception:
+        return False
 
 
 def set_title(text: str) -> None:
@@ -1844,7 +1865,7 @@ def process(meeting_dir: Path, device: str | None = None) -> bool:
             for dev in [device] if device else ["cuda", "cpu"]:
                 # Separate process: a missing CUDA/cuDNN DLL can abort the interpreter outright.
                 child = subprocess.Popen([sys.executable, __file__, "_transcribe", str(meeting_dir), "--device", dev],
-                                         creationflags=subprocess.CREATE_NO_WINDOW if sys.stdout is _log_fh else 0)
+                                         creationflags=0 if console_visible() else subprocess.CREATE_NO_WINDOW)
                 while child.poll() is None:
                     time.sleep(2)
                     if not notified and _on_minutes_ready and has_file(meeting_dir / "notes.md"):
@@ -2059,6 +2080,111 @@ def _docx_inline(par, text: str) -> None:
             par.add_run(part.replace("`", "")).bold = k % 2 == 1
 
 
+BRAND_GREY = "667085"
+
+
+def _docx_el(tag: str, **attrs):
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    el = OxmlElement(tag)
+    for k, v in attrs.items():
+        el.set(qn(f"w:{k}"), str(v))
+    return el
+
+
+def _docx_page_field(par, instr: str) -> None:
+    """A PAGE / NUMPAGES field, which Word fills in when it lays out the pages."""
+    runs = [_docx_el("w:r") for _ in range(4)]
+    runs[0].append(_docx_el("w:fldChar", fldCharType="begin"))
+    code = _docx_el("w:instrText")
+    code.text = f" {instr} "
+    runs[1].append(code)
+    runs[2].append(_docx_el("w:fldChar", fldCharType="separate"))
+    shown = _docx_el("w:t")
+    shown.text = "1"
+    runs[2].append(shown)
+    runs[3].append(_docx_el("w:fldChar", fldCharType="end"))
+    par._p.extend(runs)
+
+
+def _docx_brand_table(table, rows: list[list[str]], width: int) -> None:
+    """Columns sized to their text; light grey grid; purple header row (repeated on every page)."""
+    from docx.shared import Pt, RGBColor
+
+    longest = [max((len(r[c]) if c < len(r) else 0) for r in rows) for c in range(len(table.columns))]
+    weights = [max(4, n) ** 0.75 for n in longest]  # long text gets more room, short columns still fit
+    table.autofit = False
+    for c, column in enumerate(table.columns):
+        for cell in column.cells:
+            cell.width = int(width * weights[c] / sum(weights))
+            for par in cell.paragraphs:
+                par.paragraph_format.space_after = Pt(2)
+
+    borders = _docx_el("w:tblBorders")
+    for side in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        borders.append(_docx_el(f"w:{side}", val="single", sz=4, space=0, color="D0D5DD"))
+    table._tbl.tblPr.append(borders)
+    head = table.rows[0]
+    head._tr.get_or_add_trPr().append(_docx_el("w:tblHeader"))
+    for cell in head.cells:
+        cell._tc.get_or_add_tcPr().append(_docx_el("w:shd", val="clear", color="auto", fill=LOGO_PURPLE[1:].upper()))
+        for run in cell.paragraphs[0].runs:
+            run.bold, run.font.color.rgb = True, RGBColor(0xFF, 0xFF, 0xFF)
+
+
+def _docx_branding(doc, titles: list[str]) -> None:
+    """Notarius look: logo and name in the header, a footer with page numbers, purple headings,
+    and the file's properties (the template would otherwise say "python-docx", created in 2013)."""
+    import io
+
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+    from docx.shared import Cm, Pt, RGBColor
+
+    purple, grey = RGBColor.from_string(LOGO_PURPLE[1:].upper()), RGBColor.from_string(BRAND_GREY)
+    now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
+    props = doc.core_properties
+    props.title = titles[0] if len(titles) == 1 else "Meeting minutes"
+    props.subject, props.category, props.keywords = "Minutes of meeting", "Minutes", "minutes, meeting"
+    props.author = props.last_modified_by = my_name() if my_name() != "Me" else APP_NAME
+    props.comments = f"Minutes taken by {APP_NAME} {VERSION}"
+    props.created, props.modified, props.revision = now, now, 1
+
+    for name in ("Title", "Heading 1", "Heading 2", "Heading 3"):
+        style = doc.styles[name]
+        style.font.name, style.font.color.rgb = "Calibri", purple
+        for el in style.element.iter(qn("w:rFonts"), qn("w:color"), qn("w:bottom")):
+            for attr in ("asciiTheme", "hAnsiTheme", "eastAsiaTheme", "cstheme", "themeColor", "themeShade", "themeTint"):
+                el.attrib.pop(qn(f"w:{attr}"), None)  # theme settings would override ours
+            if el.tag == qn("w:bottom"):  # the Title's rule
+                el.set(qn("w:color"), LOGO_PURPLE[1:].upper())
+    doc.styles["Title"].font.size = Pt(22)
+    doc.styles["Footer"].font.size, doc.styles["Footer"].font.color.rgb = Pt(8.5), grey
+
+    section = doc.sections[0]
+    section.header_distance = section.footer_distance = Cm(1)
+    header = section.header.paragraphs[0]
+    png = io.BytesIO()
+    icon_image(size=128).save(png, "PNG")
+    png.seek(0)
+    header.add_run().add_picture(png, height=Cm(0.75))
+    name = header.add_run(f"  {APP_NAME}")
+    name.font.size, name.font.bold, name.font.color.rgb = Pt(12), True, purple
+    sub = header.add_run("   Minutes of meeting")
+    sub.font.size, sub.font.color.rgb = Pt(9), grey
+    header.paragraph_format.space_after = Pt(6)
+    rule = _docx_el("w:pBdr")
+    rule.append(_docx_el("w:bottom", val="single", sz=6, space=4, color="D0D5DD"))
+    header._p.get_or_add_pPr().append(rule)
+
+    footer = section.footer.paragraphs[0]
+    footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    for text, field in ((f"Minutes taken by {APP_NAME}   ·   Page ", "PAGE"), (" of ", "NUMPAGES")):
+        footer.add_run(text)
+        _docx_page_field(footer, field)
+
+
 def export_docx(dirs: list[Path]) -> bytes:
     import io
 
@@ -2069,6 +2195,7 @@ def export_docx(dirs: list[Path]) -> bytes:
     doc = Document()
     doc.styles["Normal"].font.name = "Calibri"
     doc.styles["Normal"].font.size = Pt(11)
+    _docx_branding(doc, [(meeting_summary(d) or {}).get("title") or "Teams meeting" for d in dirs])
     for n, d in enumerate(dirs):
         if n:
             doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
@@ -2081,8 +2208,10 @@ def export_docx(dirs: list[Path]) -> bytes:
                 i += 1
                 continue
             if m := re.match(r"^(#{1,4})\s+(.*)", ln):
-                level = len(m.group(1))
-                doc.add_heading(m.group(2).replace("**", ""), level=0 if level == 1 else min(level - 1, 3))
+                level, text = len(m.group(1)), m.group(2).replace("**", "")
+                if level == 1:  # "Minutes of Meeting: <title>": the page header already says that
+                    text = text.split(":", 1)[-1].strip() or text
+                doc.add_heading(text, level=0 if level == 1 else min(level - 1, 3))
             elif ln.lstrip().startswith("|"):
                 rows = []
                 while i < len(lines) and lines[i].lstrip().startswith("|"):
@@ -2096,10 +2225,11 @@ def export_docx(dirs: list[Path]) -> bytes:
                         r.append("Done" if action_row in done else "Open")
                         action_row += 1
                 table = doc.add_table(rows=len(rows), cols=max(len(r) for r in rows))
-                table.style = "Light Grid Accent 1"
                 for r, cells in enumerate(rows):
                     for c, cell in enumerate(cells):
                         _docx_inline(table.cell(r, c).paragraphs[0], cell)
+                section = doc.sections[0]
+                _docx_brand_table(table, rows, section.page_width - section.left_margin - section.right_margin)
                 continue
             elif m := re.match(r"^\s*[-*]\s+(.*)", ln):
                 _docx_inline(doc.add_paragraph(style="List Bullet"), m.group(1))
@@ -2312,6 +2442,8 @@ class _Handler(BaseHTTPRequestHandler):
         parts, q = self._route()
         if not parts or parts == ["print"]:
             return self._send(200, DASHBOARD_HTML.read_bytes(), "text/html; charset=utf-8")
+        if parts == ["logo.svg"]:
+            return self._send(200, logo_svg(), "image/svg+xml")
         if parts[0] != "api":
             return self._send(404, {"error": "not found"})
         api = parts[1:]
@@ -2340,7 +2472,7 @@ class _Handler(BaseHTTPRequestHandler):
                                     "spoken_language": s.get("spoken_language", "auto"),
                                     "minutes_language": minutes_language(),
                                     "minutes_languages": list(MINUTES_LANGUAGES), "voices": voices,
-                                    "teams_captions": s.get("teams_captions", True)})
+                                    "teams_captions": s.get("teams_captions", True), "version": VERSION})
         if api == ["meetings"]:
             return self._send(200, list_meetings())
         if api == ["search"]:
@@ -2509,6 +2641,241 @@ def start_dashboard(block: bool) -> bool:
     return True
 
 
+# --------------------------------------------------------------------------- app window
+# The dashboard opens in its own window (Edge WebView2, through pywebview) with the Notarius icon
+# and taskbar button. The window is a separate small process: closing it frees its memory and
+# forgets the session (the PIN is asked again, as with a closed browser tab), and a problem in
+# the window can never stop a recording.
+
+_mutexes = []  # held for the life of the process
+
+
+def _claim_mutex(name: str) -> bool:
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.CreateMutexW.restype = ctypes.c_void_p
+    _mutexes.append(k32.CreateMutexW(None, False, name))
+    return ctypes.get_last_error() != 183  # ERROR_ALREADY_EXISTS
+
+
+def _mutex_exists(name: str) -> bool:
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.OpenMutexW.restype = ctypes.c_void_p
+    h = k32.OpenMutexW(0x00100000, False, name)  # SYNCHRONIZE
+    if h:
+        k32.CloseHandle(ctypes.c_void_p(h))
+    return bool(h)
+
+
+def set_app_id() -> None:
+    """Taskbar button, pins and notifications as Notarius, not as Python."""
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_ID)
+    except Exception:
+        pass
+
+
+def app_windows() -> list[int]:
+    """Handles of the open Notarius windows."""
+    import psutil
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+    found = []
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def visit(hwnd, _):
+        buf = ctypes.create_unicode_buffer(256)
+        if user32.IsWindowVisible(hwnd) and user32.GetWindowTextW(hwnd, buf, 256) and buf.value == APP_NAME:
+            user32.GetClassNameW(hwnd, buf, 256)
+            pid = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            try:
+                if buf.value.startswith("WindowsForms") and psutil.Process(pid.value).name().lower() in ("python.exe", "pythonw.exe"):
+                    found.append(hwnd)
+            except psutil.Error:
+                pass
+        return True
+
+    user32.EnumWindows(visit, 0)
+    return found
+
+
+def focus_window(hwnd: int) -> None:
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+    h = wintypes.HWND(hwnd)
+    user32.ShowWindow(h, 9 if user32.IsIconic(h) else 5)  # SW_RESTORE / SW_SHOW
+    user32.SetForegroundWindow(h)
+
+
+def close_windows() -> None:
+    from ctypes import wintypes
+
+    for hwnd in app_windows():
+        ctypes.windll.user32.PostMessageW(wintypes.HWND(hwnd), 0x0010, 0, 0)  # WM_CLOSE
+
+
+def find_uvw() -> str | None:
+    for c in (shutil.which("uvw"), shutil.which("uv") and str(Path(shutil.which("uv")).with_name("uvw.exe")),
+              str(Path.home() / ".local" / "bin" / "uvw.exe")):
+        if c and Path(c).is_file():
+            return c
+    return None
+
+
+def _window_commands() -> list[list[str]]:
+    """Ways to start the window, best first. Through uvw (signed) with the console interpreter,
+    which uvw keeps hidden: Smart App Control can block the unsigned pythonw.exe launcher in uv's
+    script environment, and `uvw run --gui-script` then fails without any error."""
+    script = str(Path(__file__).resolve())
+    cmds = [[uvw, "run", "--script", script, "window"]] if (uvw := find_uvw()) else []
+    return cmds + [[sys.executable, script, "window"]]
+
+
+def show_window() -> None:
+    """Bring the Notarius window to the front, or open it. Never raises: the tray app (and the
+    recording) must keep running even if no window can be opened."""
+    try:
+        if wins := app_windows():
+            return focus_window(wins[0])
+        ctypes.windll.user32.AllowSetForegroundWindow(-1)  # ASFW_ANY: the new window may come to the front
+    except Exception as e:
+        log(f"window check failed: {e}")
+    for cmd in _window_commands():
+        try:
+            subprocess.Popen(cmd, cwd=str(APP_DIR), creationflags=subprocess.CREATE_NO_WINDOW, close_fds=True)
+            return
+        except OSError as e:
+            log(f"could not open the window with {Path(cmd[0]).name}: {e}")
+    try:
+        open_in_browser()
+    except OSError as e:
+        log(f"could not open the dashboard: {e}")
+
+
+def open_in_browser() -> None:
+    """The dashboard in an Edge app window, or the default browser, when WebView2 isn't there."""
+    if edge := _find_edge():
+        subprocess.Popen([edge, f"--app={DASHBOARD_URL}", f"--user-data-dir={APP_DIR / 'edge-app'}",
+                          "--no-first-run", "--no-default-browser-check"], creationflags=subprocess.CREATE_NO_WINDOW)
+    else:
+        webbrowser.open(DASHBOARD_URL)
+
+
+def _wait_for_dashboard(timeout: float) -> None:
+    import socket
+
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        try:
+            socket.create_connection(("127.0.0.1", DASHBOARD_PORT), timeout=1).close()
+            return
+        except OSError:
+            time.sleep(0.25)
+
+
+def _webview_context_menu() -> None:
+    """Right-click menu with only the editing commands (pywebview turns the menu off entirely)."""
+    from webview.platforms import edgechromium
+
+    keep = {"cut", "copy", "paste", "pasteAndMatchStyle", "selectAll", "undo", "redo", "emoji",
+            "spellCheck", "copyLinkLocation", "copyImage"}
+
+    def on_menu(_sender, args):
+        items = args.MenuItems
+        for i in range(items.Count - 1, -1, -1):
+            if str(items[i].Kind) != "Separator" and items[i].Name not in keep:
+                items.RemoveAt(i)
+        for i in range(items.Count - 1, -1, -1):  # no separators at the ends or in a row
+            sep = str(items[i].Kind) == "Separator"
+            if sep and (i in (0, items.Count - 1) or str(items[i - 1].Kind) == "Separator"):
+                items.RemoveAt(i)
+        if items.Count == 0:
+            args.Handled = True  # nothing useful to show here
+
+    original = edgechromium.EdgeChrome.on_webview_ready
+
+    def on_ready(self, sender, args):
+        original(self, sender, args)
+        if args.IsSuccess:
+            sender.CoreWebView2.Settings.AreDefaultContextMenusEnabled = True
+            sender.CoreWebView2.ContextMenuRequested += on_menu
+
+    edgechromium.EdgeChrome.on_webview_ready = on_ready
+
+
+def _work_area() -> tuple[int, int]:
+    """The main screen's size without the taskbar, in the logical pixels window sizes use."""
+    from ctypes import wintypes
+
+    rect = wintypes.RECT()
+    user32 = ctypes.windll.user32
+    if not user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(rect), 0):  # SPI_GETWORKAREA
+        return 1280, 800
+    dpi = user32.GetDpiForSystem() or 96  # same DPI awareness as the rect, so the ratio holds
+    return (rect.right - rect.left) * 96 // dpi, (rect.bottom - rect.top) * 96 // dpi
+
+
+def _dark_mode() -> bool:
+    import winreg
+
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") as k:
+            return winreg.QueryValueEx(k, "AppsUseLightTheme")[0] == 0
+    except OSError:
+        return False
+
+
+def cmd_window() -> None:
+    set_app_id()
+    if not _claim_mutex("Local\\notarius-window"):
+        for _ in range(40):  # one is already opening: bring it forward once it's up
+            if wins := app_windows():
+                return focus_window(wins[0])
+            time.sleep(0.25)
+        return
+    _wait_for_dashboard(30)
+    try:
+        import webview
+        from webview.platforms import winforms
+
+        if winforms.renderer != "edgechromium":
+            raise RuntimeError("Microsoft Edge WebView2 is not installed")
+        _webview_context_menu()
+    except Exception as e:
+        log(f"app window unavailable ({e}); opening the dashboard in Edge instead")
+        return open_in_browser()
+
+    webview.settings["ALLOW_DOWNLOADS"] = True  # Word/PDF export and the recovery key: a Save As dialog
+    saved = read_json(WINDOW_FILE, {})
+    work_w, work_h = _work_area()
+    width = min(int(saved.get("width") or 1280), int(work_w * 0.92))
+    height = min(int(saved.get("height") or 860), int(work_h * 0.92))
+    window = webview.create_window(
+        APP_NAME, DASHBOARD_URL, width=width, height=height, min_size=(720, 520),
+        maximized=bool(saved.get("maximized")), text_select=True, zoomable=True,
+        background_color="#0F1115" if _dark_mode() else "#F4F5F7")
+
+    def remember_size(window) -> None:  # runs on the window's thread as it closes
+        try:
+            form = window.native
+            state = str(form.WindowState)
+            bounds = form.Bounds if state == "Normal" else form.RestoreBounds
+            scale = form._scale
+            write_json(WINDOW_FILE, {"width": int(bounds.Width / scale), "height": int(bounds.Height / scale),
+                                     "maximized": state == "Maximized"})
+        except Exception as e:
+            log(f"could not save the window size: {e}")
+
+    window.events.closing += remember_size
+    icon = APP_DIR / "notarius.ico"
+    if not icon.exists():
+        save_icon(icon)
+    WEBVIEW_DIR.mkdir(parents=True, exist_ok=True)
+    webview.start(gui="edgechromium", private_mode=False, storage_path=str(WEBVIEW_DIR), icon=str(icon))
+
+
 # --------------------------------------------------------------------------- watcher
 
 def _poll_teams() -> dict[str, str | None]:
@@ -2519,16 +2886,32 @@ def _poll_teams() -> dict[str, str | None]:
         return {"render": None, "capture": None}
 
 
-_instance_lock = None
+INSTANCE_MUTEX = "Local\\teams-notetaker-watch"
+QUIT_EVENT = "Local\\notarius-quit"  # set by the uninstaller to close a running Notarius
 
 
 def _claim_single_instance() -> bool:
     """One watcher per user session, so a meeting is never recorded twice."""
-    global _instance_lock
+    return _claim_mutex(INSTANCE_MUTEX)
+
+
+def _quit_event():
     k32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    k32.CreateMutexW.restype = ctypes.c_void_p
-    _instance_lock = k32.CreateMutexW(None, False, "Local\\teams-notetaker-watch")
-    return ctypes.get_last_error() != 183  # ERROR_ALREADY_EXISTS
+    k32.CreateEventW.restype = ctypes.c_void_p
+    return k32, k32.CreateEventW(None, True, False, QUIT_EVENT)
+
+
+def quit_running_app(timeout: float = 60) -> bool:
+    """Ask a running Notarius to quit (it saves a recording in progress); True once it has."""
+    if not _mutex_exists(INSTANCE_MUTEX):
+        return True
+    k32, ev = _quit_event()
+    k32.SetEvent(ctypes.c_void_p(ev))
+    end = time.monotonic() + timeout
+    while time.monotonic() < end and _mutex_exists(INSTANCE_MUTEX):
+        time.sleep(0.5)
+    k32.CloseHandle(ctypes.c_void_p(ev))
+    return not _mutex_exists(INSTANCE_MUTEX)
 
 
 def _set_recording(rec: Recording | None) -> None:
@@ -2680,11 +3063,13 @@ def save_icon(path: Path) -> Path:
     return path
 
 
-def cmd_tray(open_browser: bool) -> None:
+def cmd_tray(open_window: bool) -> None:
     """Background app: tray icon + watcher + dashboard. Quit from the tray menu."""
+    set_app_id()
     if not _claim_single_instance():
-        if open_browser:
-            webbrowser.open(DASHBOARD_URL)
+        if open_window:
+            _wait_for_dashboard(10)
+            show_window()
         return
     global _on_minutes_ready
     import pystray
@@ -2714,15 +3099,21 @@ def cmd_tray(open_browser: bool) -> None:
             STATE["paused"] = not STATE["paused"]
         log("note-taking paused" if STATE["paused"] else "note-taking resumed")
 
+    def quit_app(ic=None, _item=None) -> None:
+        stop.set()
+        close_windows()
+        (ic or icon).stop()
+
     icon = pystray.Icon(
         "notarius", images["idle"], APP_NAME,
         menu=pystray.Menu(
-            pystray.MenuItem("Open dashboard", lambda *_: webbrowser.open(DASHBOARD_URL), default=True),
+            pystray.MenuItem(f"Open {APP_NAME}", lambda *_: show_window(), default=True),
+            pystray.MenuItem("Open in browser", lambda *_: webbrowser.open(DASHBOARD_URL)),
             pystray.MenuItem(lambda _item: status_text(), None, enabled=False),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Pause note-taking", toggle_pause, checked=lambda _item: STATE["paused"]),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem(f"Quit {APP_NAME}", lambda ic, _item: (stop.set(), ic.stop())),
+            pystray.MenuItem(f"Quit {APP_NAME}", quit_app),
         ),
     )
 
@@ -2732,64 +3123,207 @@ def cmd_tray(open_browser: bool) -> None:
         except Locked:
             title = "Your meeting"
         try:
-            icon.notify(f"{title}. Open the dashboard to read them.", "Minutes ready")
+            icon.notify(f"{title}. Open {APP_NAME} to read them.", "Minutes ready")
         except Exception:
             pass
 
     _on_minutes_ready = minutes_ready
 
     def refresh_icon() -> None:
-        last = None
+        last, had_window = None, False
         while not stop.wait(1):
             m = mode()
             if m != last:
                 icon.icon, icon.title, last = images[m], f"{APP_NAME} - {status_text()}", m
                 icon.update_menu()
+            has_window = bool(app_windows())
+            if had_window and not has_window and not settings().get("told_about_tray"):
+                # The first time the window is closed, say where Notarius went.
+                update_settings(told_about_tray=True)
+                try:
+                    icon.notify("It keeps taking notes of your Teams calls from here. Right-click this "
+                                "icon to quit.", f"{APP_NAME} is still running")
+                except Exception:
+                    pass
+            had_window = has_window
+
+    def quit_when_asked() -> None:  # the uninstaller sets this event
+        k32, ev = _quit_event()
+        k32.WaitForSingleObject(ctypes.c_void_p(ev), ctypes.c_uint32(0xFFFFFFFF))  # INFINITE
+        log("asked to quit (uninstall)")
+        quit_app()
 
     NOTES_ROOT.mkdir(parents=True, exist_ok=True)
     start_dashboard(block=False)
     watcher = threading.Thread(target=watch_loop, args=(stop,), daemon=True)
     watcher.start()
     threading.Thread(target=refresh_icon, daemon=True).start()
-    if open_browser:
-        webbrowser.open(DASHBOARD_URL)
+    threading.Thread(target=quit_when_asked, daemon=True).start()
+    if open_window:
+        show_window()
     icon.run()
     stop.set()
+    close_windows()
     watcher.join(timeout=30)  # lets an in-progress recording be saved and handed to processing
     log(f"{APP_NAME} closed")
 
 
-def cmd_install(remove: bool = False) -> None:
-    """Start-menu + Desktop shortcut (opens the dashboard) and a login item (runs in the tray)."""
+UNINSTALL_KEY = rf"Software\Microsoft\Windows\CurrentVersion\Uninstall\{APP_NAME}"  # Settings > Apps
+HOMEPAGE = "https://github.com/uzair-khan-ATS/notarius"
+
+
+INSTALL_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home()), "Programs", APP_NAME)  # where Notarius.exe installs
+
+
+def _launcher() -> Path | None:
+    """The installed Notarius.exe, when this copy was started by it (it sets NOTARIUS_LAUNCHER)."""
+    p = os.environ.get("NOTARIUS_LAUNCHER")
+    if p and Path(p).is_file() and Path(p).resolve().parent == INSTALL_DIR.resolve():
+        return Path(p).resolve()
+    return None
+
+
+def _shortcuts(shell) -> dict[Path, str]:
+    """Where the shortcuts go (the real folders, also when OneDrive moved the Desktop) -> mode."""
+    folder = lambda name: Path(shell.SpecialFolders.Item(name))
+    return {folder("Programs") / f"{APP_NAME}.lnk": "open", folder("Desktop") / f"{APP_NAME}.lnk": "open",
+            folder("Startup") / f"{APP_NAME}.lnk": "tray"}
+
+
+def _set_shortcut_app_id(lnk: Path) -> None:
+    """Tag a shortcut with APP_ID, so Windows ties the running window, pins and notifications to it."""
+    from ctypes import wintypes
+
+    class GUID(ctypes.Structure):
+        _fields_ = [("d1", wintypes.DWORD), ("d2", wintypes.WORD), ("d3", wintypes.WORD), ("d4", ctypes.c_ubyte * 8)]
+
+    class PROPERTYKEY(ctypes.Structure):
+        _fields_ = [("fmtid", GUID), ("pid", wintypes.DWORD)]
+
+    class PROPVARIANT(ctypes.Structure):
+        _fields_ = [("vt", wintypes.USHORT), ("r1", wintypes.WORD), ("r2", wintypes.WORD), ("r3", wintypes.WORD),
+                    ("value", ctypes.c_wchar_p), ("pad", ctypes.c_void_p)]
+
+    def guid(s: str) -> GUID:
+        g = GUID()
+        ctypes.oledll.ole32.CLSIDFromString(s, ctypes.byref(g))
+        return g
+
+    store = ctypes.c_void_p()
+    ctypes.oledll.shell32.SHGetPropertyStoreFromParsingName(
+        str(lnk), None, 2, ctypes.byref(guid("{886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99}")), ctypes.byref(store))  # GPS_READWRITE, IPropertyStore
+    vtbl = ctypes.cast(store, ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))).contents
+    set_value = ctypes.WINFUNCTYPE(ctypes.HRESULT, ctypes.c_void_p, ctypes.POINTER(PROPERTYKEY), ctypes.POINTER(PROPVARIANT))(vtbl[6])
+    commit = ctypes.WINFUNCTYPE(ctypes.HRESULT, ctypes.c_void_p)(vtbl[7])
+    release = ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)(vtbl[2])
+    try:
+        key = PROPERTYKEY(guid("{9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3}"), 5)  # PKEY_AppUserModel_ID
+        set_value(store, ctypes.byref(key), ctypes.byref(PROPVARIANT(vt=31, value=APP_ID)))  # VT_LPWSTR
+        commit(store)
+    finally:
+        release(store)
+
+
+def _folder_kb(*folders: Path) -> int:
+    return sum(f.stat().st_size for d in folders if d.is_dir() for f in d.rglob("*") if f.is_file()) // 1024
+
+
+def _register_app(command: str, icon: str, location: Path) -> None:
+    import winreg
+
+    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, UNINSTALL_KEY) as k:
+        for name, value in {"DisplayName": APP_NAME, "DisplayVersion": VERSION, "Publisher": PUBLISHER,
+                            "DisplayIcon": icon, "InstallLocation": str(location),
+                            "InstallDate": dt.date.today().strftime("%Y%m%d"), "URLInfoAbout": HOMEPAGE,
+                            "HelpLink": HOMEPAGE, "Comments": "Minutes of your Teams meetings, taken locally",
+                            "UninstallString": f"{command} uninstall",
+                            "QuietUninstallString": f"{command} uninstall --quiet"}.items():
+            winreg.SetValueEx(k, name, 0, winreg.REG_SZ, value)
+        for name, value in {"NoModify": 1, "NoRepair": 1, "EstimatedSize": _folder_kb(location, MODELS_DIR)}.items():
+            winreg.SetValueEx(k, name, 0, winreg.REG_DWORD, value)
+
+
+def cmd_install() -> None:
+    """Start-menu and Desktop shortcuts (open Notarius), a login item (runs it in the tray), and an
+    entry in Settings > Apps with an uninstaller."""
     import comtypes.client
 
+    launcher = _launcher()
     uvw = shutil.which("uvw") or str(Path(shutil.which("uv") or "uv").with_name("uvw.exe"))
     script = Path(__file__).resolve()
-    programs = Path(os.environ["APPDATA"], "Microsoft", "Windows", "Start Menu", "Programs")
-    desktop = Path(os.environ.get("USERPROFILE", Path.home()), "Desktop")
-    links = {programs / f"{APP_NAME}.lnk": "open", desktop / f"{APP_NAME}.lnk": "open",
-             programs / "Startup" / f"{APP_NAME}.lnk": "tray"}
-    for folder in (programs, desktop, programs / "Startup"):  # shortcuts from before the rename
-        (folder / "Meeting Notes.lnk").unlink(missing_ok=True)
-    if remove:
-        for lnk in links:
-            lnk.unlink(missing_ok=True)
-        print(f"Removed the {APP_NAME} shortcuts. Your notes are untouched in {NOTES_ROOT}")
-        return
-    if not Path(uvw).exists():
+    if not launcher and not Path(uvw).exists():
         sys.exit("uvw.exe (part of uv) was not found; install uv from https://docs.astral.sh/uv/")
     ico = save_icon(APP_DIR / "notarius.ico")
     shell = comtypes.client.CreateObject("WScript.Shell", dynamic=True)
+    links = _shortcuts(shell)
+    for folder in {lnk.parent for lnk in links}:  # shortcuts from before the rename
+        (folder / "Meeting Notes.lnk").unlink(missing_ok=True)
     for lnk, mode in links.items():
         lnk.parent.mkdir(parents=True, exist_ok=True)
         s = shell.CreateShortcut(str(lnk))
-        s.TargetPath = uvw
-        s.Arguments = f'run --gui-script "{script}" {mode}'
-        s.WorkingDirectory = str(script.parent)
-        s.IconLocation = str(ico)
+        if launcher:
+            s.TargetPath, s.Arguments = str(launcher), mode
+            s.WorkingDirectory, s.IconLocation = str(launcher.parent), f"{launcher},0"
+        else:
+            s.TargetPath, s.Arguments = uvw, f'run --script "{script}" {mode}'
+            s.WorkingDirectory, s.IconLocation = str(script.parent), str(ico)
         s.Description = f"{APP_NAME}: minutes of your Teams meetings, taken locally"
         s.Save()
-    print(f"Installed. Open {APP_NAME} from the Start menu or Desktop; it also starts at login.")
+        try:
+            _set_shortcut_app_id(lnk)
+        except OSError as e:
+            log(f"could not tag {lnk.name} with the app ID: {e}")
+    if launcher:
+        _register_app(f'"{launcher}"', f"{launcher},0", launcher.parent)
+    else:
+        _register_app(f'"{uvw}" run --script "{script}"', str(ico), script.parent)
+    print(f"Installed {APP_NAME} {VERSION}. Open it from the Start menu or Desktop; it also starts at login.")
+
+
+def cmd_uninstall(quiet: bool = False) -> None:
+    """Settings > Apps > Notarius > Uninstall (or `notarius.py uninstall`). Keeps your meetings
+    unless you choose to delete them."""
+    import winreg
+
+    import comtypes.client
+
+    gui = not console_visible() and not quiet  # started from Settings: answer with dialogs
+    title = f"Uninstall {APP_NAME}"
+
+    def ask(text: str, default_no: bool = False) -> bool:
+        flags = 0x4 | 0x20 | (0x100 if default_no else 0)  # MB_YESNO, MB_ICONQUESTION, MB_DEFBUTTON2
+        return ctypes.windll.user32.MessageBoxW(None, text, title, flags) == 6  # IDYES
+
+    def tell(text: str) -> None:
+        print(text)
+        if gui:
+            ctypes.windll.user32.MessageBoxW(None, text, title, 0x40)
+
+    if gui and not ask(f"Remove {APP_NAME} from this computer?"):
+        return
+    if not quit_running_app():
+        return tell(f"{APP_NAME} is still saving a recording. Try again in a minute.")
+    close_windows()
+    shell = comtypes.client.CreateObject("WScript.Shell", dynamic=True)
+    for lnk in _shortcuts(shell):
+        lnk.unlink(missing_ok=True)
+        lnk.with_name("Meeting Notes.lnk").unlink(missing_ok=True)
+    try:
+        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, UNINSTALL_KEY)
+    except OSError:
+        pass
+    remove_data = gui and ask(
+        f"Also delete your meetings, remembered voices and the downloaded speech models?\n\n"
+        f"They're in {APP_DIR}.\nChoose No to keep them for a later reinstall.", default_no=True)
+    folders = [p for p in (_launcher() and _launcher().parent, APP_DIR if remove_data else None) if p]
+    os.chdir(Path.home())
+    for folder in folders:
+        shutil.rmtree(folder, ignore_errors=True)
+    if folders:  # what's still in use (this log, the launcher) goes once this process has ended
+        rm = " & ".join(f'rmdir /s /q "{f}"' for f in folders)
+        subprocess.Popen(f'cmd.exe /d /c ping -n 4 127.0.0.1 >nul & {rm}', cwd=str(Path.home()),
+                         creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS)
+    tell(f"{APP_NAME} was removed." + ("" if remove_data else f" Your meetings are kept in {NOTES_ROOT}."))
 
 
 def cmd_record() -> None:
@@ -2808,8 +3342,10 @@ def main() -> None:
     _redirect_std_streams_if_windowless()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd")
-    for name in ("open", "tray", "watch", "record", "status", "dashboard", "install", "uninstall"):
+    for name in ("open", "tray", "window", "watch", "record", "status", "dashboard", "install", "version"):
         sub.add_parser(name)
+    u = sub.add_parser("uninstall")
+    u.add_argument("--quiet", action="store_true", help="no questions; keeps your meetings")
     p = sub.add_parser("process")
     p.add_argument("dir", type=Path)
     p.add_argument("--device", choices=["cuda", "cpu"])
@@ -2827,9 +3363,11 @@ def main() -> None:
         if a.cmd in (None, "open", "tray", "watch", "install"):
             migrate_storage()
         if a.cmd in (None, "open"):
-            cmd_tray(open_browser=True)
+            cmd_tray(open_window=True)
         elif a.cmd == "tray":
-            cmd_tray(open_browser=False)
+            cmd_tray(open_window=False)
+        elif a.cmd == "window":
+            cmd_window()
         elif a.cmd == "watch":
             cmd_watch()
         elif a.cmd == "record":
@@ -2839,7 +3377,9 @@ def main() -> None:
         elif a.cmd == "install":
             cmd_install()
         elif a.cmd == "uninstall":
-            cmd_install(remove=True)
+            cmd_uninstall(quiet=a.quiet)
+        elif a.cmd == "version":
+            print(f"{APP_NAME} {VERSION}")
         elif a.cmd == "status":
             d = teams_audio_devices()
             print(f"in Teams call: {bool(d['render'])}  | call audio: {d['render']}  | mic: {d['capture']}")

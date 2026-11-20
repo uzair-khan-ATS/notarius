@@ -6,10 +6,12 @@ script using the dependencies declared at its top (PEP 723), so there is no sepa
 ## Processes
 
 ```
-Notarius tray app (pythonw)                      started by the Start-menu / login shortcut
+Notarius tray app (python, hidden console)       started by the Start-menu / login shortcut (uvw)
 ├─ tray icon (pystray)                           status colour, menu, "Minutes ready" toast
 ├─ watcher thread                                polls Teams audio every 2 s, records calls
 ├─ dashboard server (127.0.0.1:8765)             serves dashboard.html + a JSON API
+├─ window child process (`window`)               the app window: dashboard.html in Edge
+│                                                WebView2 (pywebview); closing it ends it
 └─ per meeting, when the call ends:
    └─ _transcribe child process                  transcription + minutes, isolated so a GPU
       ├─ _diarize child process                  library crash can't take down the tray app
@@ -17,6 +19,15 @@ Notarius tray app (pythonw)                      started by the Start-menu / log
 ```
 
 Only one tray app runs per Windows session (a named mutex), so a call is never recorded twice.
+
+**The app window** is a separate process, so closing it frees its memory and its session (the PIN
+is asked again), and a fault in the window can't stop a recording. Only one window opens: opening
+Notarius again brings it to the front. Processes set the Windows app ID `Notarius.MeetingNotes`,
+which the shortcuts carry too, so the window gets its own taskbar button and pins, and
+notifications show as Notarius. The window remembers its size (`window.json`); its browser
+profile (`webview\`) holds only the theme and tour state. The right-click menu is cut down to
+editing commands, and Word/PDF downloads open a Save As dialog. Without WebView2 the window falls
+back to an Edge app window, then to the default browser.
 
 ## 1. Detecting a call
 
@@ -180,8 +191,8 @@ Other files in the `Meetings` folder:
 **Dashboard sessions.**
 
 - **Unlocking.** Unlocking loads the private key into memory and returns a random session token.
-  The page keeps the token in memory only (sent as `X-Session`, never a cookie), so a reload or
-  new tab asks for the PIN again.
+  The page keeps the token in memory only (sent as `X-Session`, never a cookie), so a reload, a
+  new tab or a newly opened window asks for the PIN again.
 - **Expiry and locking.**
   - Sessions expire after 5 minutes idle; the page also locks after 1 minute away from the tab.
   - All sessions end, and the key is dropped from memory, when Windows shows its lock screen
@@ -199,6 +210,12 @@ Other files in the `Meetings` folder:
 - Responses carry `X-Frame-Options: DENY`.
 - PDF export prints a page with headless Edge, using a one-time token that is valid for 2
   minutes.
+
+**Exports.** Word and PDF files carry the Notarius look: the logo and name at the top, purple
+headings, an action table with a purple header row that repeats on each page, and a
+"Minutes taken by Notarius · Page X of Y" footer. Their document properties hold the meeting
+title, your name as author and the Notarius version. The logo is drawn from the same numbers as
+`assets/logo.svg` and served at `/logo.svg`.
 
 ## 6. Dashboard API
 
@@ -232,9 +249,12 @@ Environment variables (all optional):
 ## 8. Commands
 
 ```powershell
-uv run --script notarius.py install | uninstall   # shortcuts + login item
-uv run --script notarius.py open                  # tray app + dashboard (what the shortcuts run)
+uv run --script notarius.py install              # shortcuts, login item, Settings > Apps entry
+uv run --script notarius.py uninstall [--quiet]   # undo install; --quiet asks nothing, keeps data
+uv run --script notarius.py open                  # tray app + app window (what the shortcuts run)
 uv run --script notarius.py tray                  # tray app only (login item)
+uv run --script notarius.py window                # the app window alone (the tray app opens it)
+uv run --script notarius.py version               # print the version
 uv run --script notarius.py watch                 # watcher + dashboard in a console, live logs
 uv run --script notarius.py record                # record now; Ctrl+C stops (any app)
 uv run --script notarius.py status                # is a Teams call detected right now?
@@ -245,16 +265,32 @@ Logs go to `%LOCALAPPDATA%\Notarius\notetaker.log`. They record events and timin
 
 ## 9. Building Notarius.exe
 
-`build-exe.cmd` packs `launcher.py` (with `notarius.py` and `dashboard.html` inside) into
-`dist\Notarius.exe` with PyInstaller.
+`build-exe.cmd` (or `uv run --script build-exe.py`) packs `launcher.py`, with `notarius.py` and
+`dashboard.html` inside, into `dist\Notarius.exe` with PyInstaller. Set `VERSION` in
+`notarius.py` before a release; the build stamps it, the publisher and the copyright into the
+.exe's version details (Properties > Details, Task Manager). It is built without UPX, which makes
+antivirus scanners flag unsigned files, and writes `Notarius.exe.sha256` next to it.
 
-The launcher:
+The launcher installs per user, with no admin rights, the way other Windows apps do:
 
-1. copies the two files to `%LOCALAPPDATA%\Notarius\app`;
-2. creates the shortcuts on first run;
-3. starts the app through `uvw`.
+1. it copies itself, `notarius.py` and `dashboard.html` to `%LOCALAPPDATA%\Programs\Notarius`
+   (program files), separate from `%LOCALAPPDATA%\Notarius` (meetings, voices, models), which
+   updates never touch;
+2. when the version changed, it runs `install`. That points the shortcuts at the installed
+   `Notarius.exe`, gives them the app ID, and writes the Settings > Apps entry (version,
+   publisher, icon, size, uninstall command);
+3. it starts the app through `uvw`, passing `NOTARIUS_LAUNCHER` so the app knows it was installed
+   by the .exe.
 
-It isn't code-signed, so Windows Smart App Control blocks it. The script install doesn't have this
+A newer `Notarius.exe` updates the installed copy; an older one starts the installed newer
+version instead of downgrading it. **Uninstall** (from Settings, or `Notarius.exe uninstall`)
+asks the running app to quit (a named event; it saves a recording first), removes the shortcuts,
+the Settings entry and the program folder, and deletes your data only if you say so.
+
+**Code signing.** The .exe isn't signed yet, so SmartScreen warns about an unknown publisher and
+Smart App Control blocks it. With a code-signing certificate, set `NOTARIUS_SIGN_CERT` (a .pfx
+path, with `NOTARIUS_SIGN_PASSWORD`, or a certificate thumbprint) and put `signtool.exe` on
+PATH: the build then signs and timestamps the .exe. The script install doesn't have this
 problem.
 
 ## 10. Measured performance
