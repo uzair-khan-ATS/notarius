@@ -364,6 +364,7 @@ body.print .pmeta { color: var(--muted); margin-bottom: 14px; }
     <label class="field"><span>Language people speak in calls</span>
       <select id="set-spoken"><option value="auto">Detect automatically</option><option value="en">English</option><option value="ur">Urdu</option><option value="hi">Hindi</option></select>
       <small>Choose Urdu or Hindi if most of your calls are in that language and detection gets it wrong. Mixed English-Urdu calls usually work best with automatic detection.</small></label>
+    <label class="check" style="margin:0 0 14px"><input type="checkbox" id="set-captions"><span><b>Use Teams live captions for speaker names.</b> During a call Notarius turns on captions in your Teams window (only you see them) and reads who is speaking and whether you're muted. Teams' caption text isn't used; only who spoke and when.</span></label>
     <label class="field"><span>Write minutes in</span>
       <select id="set-minutes"><option>English</option><option>Roman Urdu</option></select></label>
     <hr>
@@ -743,7 +744,7 @@ function renderMeeting() {
   if (S.tab === "people" && nameable.length) {
     const row = (p) => {
       const value = p.name || p.suggested || "";
-      const badge = p.auto ? '<span class="badge voice">Recognized by voice</span>' : p.suggested && !p.name ? '<span class="badge sugg">Suggested from the conversation</span>' : "";
+      const badge = p.teams ? '<span class="badge voice">From Teams captions</span>' : p.auto ? '<span class="badge voice">Recognized by voice</span>' : p.suggested && !p.name ? '<span class="badge sugg">Suggested from the conversation</span>' : "";
       const ph = p.id === "ME" ? "Your name" : `Name for Speaker ${p.id.slice(1)}`;
       return `<div class="person"><span class="sw" style="background:${colorFor(p.id)}"></span>
         ${p.nameable ? `<input data-speaker="${p.id}" value="${esc(value)}" data-orig="${esc(p.name || "")}" placeholder="${esc(ph)}" aria-label="${esc(ph)}">` : `<b>${esc(p.label)}</b>`}
@@ -1047,7 +1048,7 @@ $("#pause").onclick = async () => {
 async function loadSettings() { const r = await api("/api/settings"); if (r.ok) S.settings = await r.json(); }
 $("#open-settings").onclick = async () => {
   await loadSettings(); const s = S.settings || {};
-  $("#set-name").value = s.my_name || ""; $("#set-spoken").value = s.spoken_language || "auto"; $("#set-minutes").value = s.minutes_language || "English";
+  $("#set-name").value = s.my_name || ""; $("#set-spoken").value = s.spoken_language || "auto"; $("#set-minutes").value = s.minutes_language || "English"; $("#set-captions").checked = s.teams_captions !== false;
   $("#set-old").value = ""; $("#set-new").value = ""; $("#set-err").textContent = "";
   showVoices();
   $("#settings").hidden = false; $("#set-name").focus();
@@ -1079,7 +1080,7 @@ $("#settings-form").addEventListener("submit", async (e) => {
     const r = await api("/api/auth/change", { method: "POST", body: JSON.stringify({ password: $("#set-old").value, new_password: $("#set-new").value }) });
     if (!r.ok) { $("#set-err").textContent = (await r.json().catch(() => ({}))).error || "Couldn't change the password."; return; }
   }
-  const r = await api("/api/settings", { method: "PUT", body: JSON.stringify({ my_name: $("#set-name").value, spoken_language: $("#set-spoken").value, minutes_language: $("#set-minutes").value }) });
+  const r = await api("/api/settings", { method: "PUT", body: JSON.stringify({ my_name: $("#set-name").value, spoken_language: $("#set-spoken").value, minutes_language: $("#set-minutes").value, teams_captions: $("#set-captions").checked }) });
   if (!r.ok) { $("#set-err").textContent = "Couldn't save the settings."; return; }
   $("#settings").hidden = true; toast("Settings saved."); await loadSettings(); refreshData(true);
 });

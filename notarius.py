@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import base64
 import bisect
+import difflib
 import ctypes
 import datetime as dt
 import http.cookies
@@ -117,7 +118,7 @@ STOP_AFTER_S = 30      # call audio closed this long = call over (survives holds
 MIN_MEETING_S = 60     # shorter recordings (mic tests) are discarded
 MAX_MEETING_S = 4 * 3600
 TRACK_FILES = ("mic.wav", "others.wav")
-SENSITIVE_FILES = ("notes.md", "transcript.md", "segments.json", "speakers.json", "my_notes.md",
+SENSITIVE_FILES = ("notes.md", "transcript.md", "segments.json", "speakers.json", "my_notes.md", "teams.json",
                    "notes.english.md", "notes.roman-urdu.md")
 SESSION_IDLE_S = 5 * 60  # the dashboard locks after 5 minutes without activity
 # Speaker separation runs on the CPU at ~1/6 of real time. If it isn't done this many seconds
@@ -691,8 +692,13 @@ class Recording:
         }
         write_json(self.dir / "meta.json", self.meta)
         log(f"recording -> {out_dir.name}  (mic: {self.meta['mic']} | speaker: {self.meta['speaker']})")
+        self.teams = TeamsObserver(self.t0, settings().get("teams_captions", True)).start()
+        self.teams_data: dict | None = None
 
     def stop(self) -> float:
+        if getattr(self, "teams", None) is not None:
+            self.teams_data = self.teams.stop()
+            self.teams = None
         for t in self.tracks:
             try:
                 t.close()
@@ -1299,9 +1305,316 @@ def _diarization_result(proc, meeting_dir: Path, timeout: float):
     return True, result
 
 
-def _assemble(meeting_dir: Path, mine: list[dict], call: list[dict], result) -> tuple[str, dict]:
+# --------------------------------------------------------------------------- Teams integration
+# While a call is recorded, the Teams meeting window is read through Windows UI Automation (the
+# accessibility interface screen readers use): the mic button tells whether you're muted, and the
+# live captions tell who is speaking. Teams knows exactly who speaks (each person's audio arrives
+# separately), but its caption *text* is rough, so only the speaker names and timing are used;
+# Notarius's own transcription stays the text.
+
+CAP_LEAD, CAP_LAG = 3.0, 1.0   # a caption appears ~1-3 s after its speech starts; ends ~1 s after
+_UIA_AUTOMATION_ID, _UIA_CONTROL_TYPE, _UIA_PROCESS_ID = 30011, 30003, 30002
+_UIA_TEXT, _UIA_INVOKE, _SCOPE_CHILDREN, _SCOPE_DESCENDANTS = 50020, 10000, 2, 4
+
+
+class TeamsObserver:
+    """Mute timeline + captions of the Teams call being recorded (times relative to `t0`)."""
+
+    POLL_S = 1.0
+    CAPTIONS_AFTER_S = 15.0
+
+    def __init__(self, t0: float, turn_on_captions: bool):
+        self.t0, self.turn_on = t0, turn_on_captions
+        self.mute: list[list] = []          # [[offset, muted], ...] at each change
+        self.captions: list[dict] = []      # {"speaker", "text", "t0", "t1"}
+        self.saw_window = self.tried_captions = False
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    def start(self) -> "TeamsObserver":
+        self._thread.start()
+        return self
+
+    def stop(self) -> dict:
+        self._stop.set()
+        self._thread.join(timeout=5)
+        return {"mute": self.mute, "captions": self.captions, "seen_teams": self.saw_window}
+
+    def _run(self) -> None:
+        try:
+            import comtypes
+            import comtypes.client
+
+            comtypes.CoInitialize()
+            comtypes.client.GetModule("UIAutomationCore.dll")
+            from comtypes.gen import UIAutomationClient as UIA
+
+            self.uia = comtypes.client.CreateObject(UIA.CUIAutomation, interface=UIA.IUIAutomation)
+            self.UIA = UIA
+        except Exception as e:
+            log(f"Teams observer unavailable: {e!r}")
+            return
+        self.walker = self.uia.ControlViewWalker
+        by_id = lambda v: self.uia.CreatePropertyCondition(_UIA_AUTOMATION_ID, v)
+        self.c_mic, self.c_cc = by_id("microphone-button"), by_id("closed-captions-button")
+        self.c_dismiss = by_id("captions-panel-dismiss-button")
+        self.c_text = self.uia.CreatePropertyCondition(_UIA_CONTROL_TYPE, _UIA_TEXT)
+        win = None
+        while not self._stop.wait(self.POLL_S):
+            try:
+                win = win or self._meeting_window()
+                if not win:
+                    continue
+                mic = win.FindFirst(_SCOPE_DESCENDANTS, self.c_mic)
+                if not mic:
+                    win = None
+                    continue
+                if not self.saw_window:
+                    self.saw_window = True
+                    log("Teams meeting window found: following mute state and captions")
+                now = time.monotonic() - self.t0
+                self._note_mute(now, mic.CurrentName or "")
+                self._read_captions(win, now)
+            except (Exception, ValueError):
+                win = None
+
+    def _meeting_window(self):
+        import psutil
+
+        root = self.uia.GetRootElement()
+        for p in psutil.process_iter(["name", "pid"]):
+            if (p.info["name"] or "").lower() not in TEAMS_EXES:
+                continue
+            wins = root.FindAll(_SCOPE_CHILDREN, self.uia.CreatePropertyCondition(_UIA_PROCESS_ID, p.info["pid"]))
+            for i in range(wins.Length):
+                w = wins.GetElement(i)
+                if w.FindFirst(_SCOPE_DESCENDANTS, self.c_mic):
+                    return w
+        return None
+
+    def _note_mute(self, now: float, label: str) -> None:
+        # The mic button offers the opposite action: "Unmute mic" while you're muted.
+        if not label.strip():
+            return
+        muted = label.strip().lower().startswith("unmute")
+        if not self.mute or self.mute[-1][1] != muted:
+            self.mute.append([round(now, 2), muted])
+
+    def _read_captions(self, win, now: float) -> None:
+        dismiss = win.FindFirst(_SCOPE_DESCENDANTS, self.c_dismiss)
+        if not dismiss:
+            if self.turn_on and not self.tried_captions and now > self.CAPTIONS_AFTER_S:
+                self.tried_captions = True
+                btn = win.FindFirst(_SCOPE_DESCENDANTS, self.c_cc)
+                if btn:
+                    btn.GetCurrentPattern(_UIA_INVOKE).QueryInterface(self.UIA.IUIAutomationInvokePattern).Invoke()
+                    log("turned on Teams live captions (used for speaker names)")
+            return
+        panel = self.walker.GetParentElement(dismiss)
+        texts = panel.FindAll(_SCOPE_DESCENDANTS, self.c_text)
+        groups: dict = {}
+        for i in range(texts.Length):
+            t = texts.GetElement(i)
+            key = tuple(self.walker.GetParentElement(t).GetRuntimeId())
+            groups.setdefault(key, []).append((t.CurrentName or "").strip())
+        entries = [(g[0], g[1]) for g in groups.values() if len(g) == 2 and g[0] and g[1]]  # (speaker, text)
+        self._merge(entries, now)
+
+    @staticmethod
+    def _same(stored: dict, entry: tuple) -> bool:
+        if stored["speaker"] != entry[0]:
+            return False
+        a, b = stored["text"].rstrip(". "), entry[1].rstrip(". ")
+        return a == b or a.startswith(b) or b.startswith(a) or difflib.SequenceMatcher(None, a, b).ratio() >= 0.6
+
+    def _merge(self, entries: list[tuple], now: float) -> None:
+        """The caption panel shows the latest captions, the last one still growing: line it up
+        with what's stored, update what changed, append what's new."""
+        if not entries:
+            return
+        stored, j = self.captions, None
+        for cand in range(len(stored) - 1, max(-1, len(stored) - 80), -1):
+            k = min(len(entries), len(stored) - cand)
+            if all(self._same(stored[cand + i], entries[i]) for i in range(k)):
+                j = cand
+                break
+        j = len(stored) if j is None else j
+        for i, (spk, txt) in enumerate(entries):
+            if j + i < len(stored):
+                c = stored[j + i]
+                if txt != c["text"]:
+                    c["text"], c["t1"] = txt, round(now, 2)
+            else:
+                stored.append({"speaker": spk, "text": txt, "t0": round(now, 2), "t1": round(now, 2)})
+
+
+def _teams_handoff(meeting_dir: Path) -> Path:
+    """Plain copy for the processing child (which can't open encrypted files); deleted after use."""
+    return APP_DIR / "tmp" / f"{meeting_dir.name}.teams.json"
+
+
+def _norm_text(text: str) -> str:
+    return " ".join(re.sub(r"[^\w\s]", " ", text.lower()).split())
+
+
+def muted_intervals(teams: dict, end: float) -> list[tuple[float, float]]:
+    out, start = [], None
+    for t, muted in teams.get("mute") or []:
+        if muted and start is None:
+            start = t
+        elif not muted and start is not None:
+            out.append((start, t))
+            start = None
+    if start is not None:
+        out.append((start, end))
+    return out
+
+
+def drop_muted(mine: list[dict], intervals: list) -> tuple[list[dict], int]:
+    """Your mic while Teams had you muted is not part of the meeting."""
+    if not intervals:
+        return mine, 0
+    kept, dropped = [], 0
+    for seg in mine:
+        for w in seg.get("words") or [(seg["start"], seg["end"], " " + seg["text"])]:
+            t = (w[0] + w[1]) / 2
+            if any(a - 0.3 <= t <= b + 0.3 for a, b in intervals):
+                dropped += 1
+            else:
+                kept.append(w)
+    return regroup_words(kept), dropped
+
+
+def _caption_hits(segs: list[dict], captions: list[dict]) -> dict:
+    """{speaker: number of words in `segs` found in that speaker's caption at that moment}."""
+    hits: dict[str, int] = {}
+    for seg in segs:
+        for ws, we, w in seg.get("words") or []:
+            t, n = (ws + we) / 2, _norm_word(w)
+            for c in captions:
+                if n and c["t0"] - CAP_LEAD <= t <= c["t1"] + CAP_LAG and n in c["_tok"]:
+                    hits[c["speaker"]] = hits.get(c["speaker"], 0) + 1
+    return hits
+
+
+def my_caption_name(mine: list[dict], call: list[dict], captions: list[dict]) -> str | None:
+    """Which caption name is you: the one whose words come from your mic, not the call audio."""
+    on_mic, on_call = _caption_hits(mine, captions), _caption_hits(call, captions)
+    best = max(on_mic, key=on_mic.get, default=None)
+    if best and on_mic[best] >= 5 and on_mic[best] >= 2 * on_call.get(best, 0):
+        return best
+    return None
+
+
+def remove_caption_echo(mine: list[dict], captions: list[dict], me: str | None) -> tuple[list[dict], int]:
+    """Words on your mic that someone else's caption shows at that moment (and yours doesn't)."""
+    kept, dropped = [], 0
+    for seg in mine:
+        words = seg.get("words") or []
+        flag = []
+        for ws, we, w in words:
+            t, n = (ws + we) / 2, _norm_word(w)
+            active = [c for c in captions if c["t0"] - CAP_LEAD <= t <= c["t1"] + CAP_LAG and n and n in c["_tok"]]
+            flag.append(bool(active) and all(c["speaker"] != me for c in active))
+        for i, word in enumerate(words):
+            if flag[i] and ((i > 0 and flag[i - 1]) or (i + 1 < len(flag) and flag[i + 1])):
+                dropped += 1
+            else:
+                kept.append(word)
+    return regroup_words(kept), dropped
+
+
+def attribute_call(call: list[dict], result, captions: list[dict], me: str | None, meeting_id: str):
+    """Label call-audio words with the Teams caption speaker at that moment; where captions don't
+    decide, use the voice cluster's majority caption name, else the voice cluster itself.
+    Returns (segments, speakers)."""
+    caps = [c for c in captions if c["speaker"] != me]
+    turns = [tuple(t) for t in result["turns"]] if result else []
+    starts = [t[0] for t in turns]
+
+    def cluster_at(t: float) -> str | None:
+        i = bisect.bisect_right(starts, t) - 1
+        if i >= 0 and turns[i][0] <= t <= turns[i][1] + 0.5:
+            return turns[i][2]
+        return None
+
+    rows = []  # [start, end, word, caption_name, cluster]
+    for seg in call:
+        for ws, we, w in seg.get("words") or [(seg["start"], seg["end"], " " + seg["text"])]:
+            t, n = (ws + we) / 2, _norm_word(w)
+            active = [c for c in caps if c["t0"] - CAP_LEAD <= t <= c["t1"] + CAP_LAG]
+            named = {c["speaker"] for c in active if n and n in c["_tok"]}
+            everyone = {c["speaker"] for c in active}
+            name = next(iter(named)) if len(named) == 1 else (next(iter(everyone)) if not named and len(everyone) == 1 else None)
+            rows.append([ws, we, w, name, cluster_at(t)])
+    votes: dict[str, dict[str, int]] = {}
+    for r in rows:
+        if r[3] and r[4]:
+            votes.setdefault(r[4], {}).setdefault(r[3], 0)
+            votes[r[4]][r[3]] += 1
+    cluster_name = {}
+    for cl, v in votes.items():
+        top = max(v, key=v.get)
+        if v[top] >= 5 and v[top] >= 0.6 * sum(v.values()):
+            cluster_name[cl] = top
+    runs: list[dict] = []
+    for ws, we, w, name, cl in rows:
+        key = ("n", name) if name else (("n", cluster_name[cl]) if cl in cluster_name else ("c", cl or "OTHERS"))
+        if runs and runs[-1]["key"] == key:
+            runs[-1]["end"], runs[-1]["text"], runs[-1]["n"] = we, runs[-1]["text"] + w, runs[-1]["n"] + 1
+        else:
+            runs.append({"key": key, "start": ws, "end": we, "text": w, "n": 1})
+    k = 1
+    while k < len(runs) - 1:  # one stray word inside someone else's run is a boundary wobble
+        if runs[k]["n"] == 1 and runs[k - 1]["key"] == runs[k + 1]["key"]:
+            a, b, c = runs[k - 1], runs[k], runs[k + 1]
+            a["end"], a["text"], a["n"] = c["end"], a["text"] + b["text"] + c["text"], a["n"] + b["n"] + c["n"]
+            del runs[k:k + 2]
+        else:
+            k += 1
+    profiles = (result or {}).get("speakers", {})
+    label: dict = {}
+    speakers: dict[str, dict] = {}
+    segs = []
+    for r in runs:
+        text = r["text"].strip()
+        if not text:
+            continue
+        kind, val = r["key"]
+        if kind == "c" and val == "OTHERS":
+            who = "OTHERS"
+        else:
+            who = label.setdefault(r["key"], f"S{len(label) + 1}")
+            if who not in speakers:
+                if kind == "n":
+                    src = max((cl for cl, nm in cluster_name.items() if nm == val), default=None,
+                              key=lambda cl: votes[cl][val])
+                    speakers[who] = {"name": val, "auto": True, "source": "teams", "seconds": 0.0,
+                                     "embedding": profiles.get(src, {}).get("embedding") if src else None}
+                else:
+                    speakers[who] = {**profiles.get(val, {}), "seconds": 0.0}
+            speakers[who]["seconds"] = round(speakers[who]["seconds"] + r["end"] - r["start"], 1)
+        segs.append({"start": r["start"], "end": r["end"], "who": who, "text": text})
+    # Names Teams gave are reliable: let them teach voice memory for meetings without captions.
+    if cluster_name:
+        voices = read_voices()
+        for cl, nm in cluster_name.items():
+            prof = profiles.get(cl, {})
+            if prof.get("embedding") and prof.get("seconds", 0) >= VOICE_MIN_S:
+                samples = voices.setdefault(nm, {})
+                samples[f"{meeting_id}/{cl}"] = prof["embedding"]
+                while len(samples) > VOICE_SAMPLES_PER_PERSON:
+                    samples.pop(next(iter(samples)))
+        write_voices(voices)
+    return segs, speakers
+
+
+def _assemble(meeting_dir: Path, mine: list[dict], call: list[dict], result, teams: dict | None = None) -> tuple[str, dict]:
     """Merge both tracks, label speakers, save segments + speakers + transcript (encrypted if set)."""
-    if result:
+    if teams and teams.get("captions"):
+        call_segs, speakers = attribute_call(call, result, teams["captions"], teams.get("me"), meeting_dir.name)
+        log(f"  speaker names from Teams captions: {sorted({s['name'] for s in speakers.values() if s.get('name')})}")
+    elif result:
         turns = [tuple(t) for t in result["turns"]]
         call_segs = split_by_speaker(call, turns)
         speakers = result["speakers"]
@@ -1474,6 +1787,22 @@ def _transcribe_and_write(meeting_dir: Path, device: str) -> None:
             if leaked:
                 log(f"  removed {leaked} mic sentence(s) whose sound was the call audio leaking in")
             del mic_audio, call_audio
+        handoff = _teams_handoff(meeting_dir)
+        teams = read_json(handoff, None)
+        handoff.unlink(missing_ok=True)
+        if teams:
+            end = max([x["end"] for x in mine + call] or [0.0]) + 60
+            mine, muted = drop_muted(mine, muted_intervals(teams, end))
+            if muted:
+                log(f"  removed {muted} mic word(s) spoken while Teams had you muted")
+            caps = teams.get("captions") or []
+            for c in caps:
+                c["_tok"] = set(_norm_text(c["text"]).split())
+            if caps:
+                teams["me"] = my_caption_name(mine, call, caps)
+                mine, cap_echo = remove_caption_echo(mine, caps, teams["me"])
+                if cap_echo:
+                    log(f"  removed {cap_echo} mic word(s) that were someone else's captioned speech")
         del tr  # free the GPU before the (CPU) wait below
         log(f"transcribed in {time.monotonic() - t0:.0f}s")
     except BaseException:
@@ -1484,7 +1813,7 @@ def _transcribe_and_write(meeting_dir: Path, device: str) -> None:
     done, result = _diarization_result(diar, meeting_dir, QUICK_DIARIZE_WAIT_S)
     if not done:
         log("minutes first; speakers will be added when separation finishes")
-        transcript, speakers = _assemble(meeting_dir, mine, call, None)
+        transcript, speakers = _assemble(meeting_dir, mine, call, None, teams)
         update_meta(meeting_dir, speakers_pending=True)
         if not write_notes(meeting_dir, transcript, speakers):
             update_meta(meeting_dir, error="minutes failed (the transcript is available)")
@@ -1492,7 +1821,7 @@ def _transcribe_and_write(meeting_dir: Path, device: str) -> None:
         if not result:
             update_meta(meeting_dir, speakers_pending=None)
             return
-    transcript, speakers = _assemble(meeting_dir, mine, call, result)
+    transcript, speakers = _assemble(meeting_dir, mine, call, result, teams)
     if not write_notes(meeting_dir, transcript, speakers) and not has_file(meeting_dir / "notes.md"):
         update_meta(meeting_dir, error="minutes failed (the transcript is available)")
     update_meta(meeting_dir, speakers_pending=None)
@@ -1506,6 +1835,12 @@ def process(meeting_dir: Path, device: str | None = None) -> bool:
     try:
         if not has_file(meeting_dir / "segments.json") and any(_usable(meeting_dir / f) for f in TRACK_FILES):
             notified = False
+            if not _teams_handoff(meeting_dir).exists():
+                try:
+                    if (data := load_json(meeting_dir / "teams.json", None)):
+                        write_json(_teams_handoff(meeting_dir), data)
+                except Locked:
+                    pass
             for dev in [device] if device else ["cuda", "cpu"]:
                 # Separate process: a missing CUDA/cuDNN DLL can abort the interpreter outright.
                 child = subprocess.Popen([sys.executable, __file__, "_transcribe", str(meeting_dir), "--device", dev],
@@ -1551,6 +1886,11 @@ def finish(rec: Recording, discard: bool = False) -> None:
         log(f"{'paused' if discard else f'only {secs:.0f}s recorded'} - discarding {rec.dir.name}")
         shutil.rmtree(rec.dir, ignore_errors=True)
         return
+    data = getattr(rec, "teams_data", None) or {}
+    if data.get("seen_teams"):
+        log(f"Teams: {len(data.get('captions', []))} caption(s), {len(data.get('mute', []))} mute change(s)")
+        write_json(_teams_handoff(rec.dir), data)
+        save_json(rec.dir / "teams.json", data)
     log(f"recorded {secs / 60:.1f} min, processing")
     threading.Thread(target=process, args=(rec.dir,), daemon=False).start()
 
@@ -1637,7 +1977,7 @@ def meeting_speakers(d: Path) -> list[dict]:
         out.append({
             "id": who, "label": speaker_label(who, speakers, me), "seconds": round(talk[who]),
             "name": me if who == "ME" and me != "Me" else sp.get("name"),
-            "suggested": sp.get("suggested"), "auto": bool(sp.get("auto")),
+            "suggested": sp.get("suggested"), "auto": bool(sp.get("auto")), "teams": sp.get("source") == "teams",
             "nameable": who == "ME" or who in speakers, "sample": sample.get(who, "")[:140],
         })
     return out
@@ -1999,7 +2339,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._send(200, {"my_name": my_name() if my_name() != "Me" else "",
                                     "spoken_language": s.get("spoken_language", "auto"),
                                     "minutes_language": minutes_language(),
-                                    "minutes_languages": list(MINUTES_LANGUAGES), "voices": voices})
+                                    "minutes_languages": list(MINUTES_LANGUAGES), "voices": voices,
+                                    "teams_captions": s.get("teams_captions", True)})
         if api == ["meetings"]:
             return self._send(200, list_meetings())
         if api == ["search"]:
@@ -2041,6 +2382,8 @@ class _Handler(BaseHTTPRequestHandler):
                     fields["spoken_language"] = body["spoken_language"]
                 if body.get("minutes_language") in MINUTES_LANGUAGES:
                     fields["minutes_language"] = body["minutes_language"]
+                if isinstance(body.get("teams_captions"), bool):
+                    fields["teams_captions"] = body["teams_captions"]
                 update_settings(**fields)
                 return self._send(200, {"ok": True})
             if len(api) == 3 and api[0] == "meetings" and (d := self._meeting_dir(api[1])):

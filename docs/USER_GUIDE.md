@@ -162,6 +162,24 @@ Your own microphone is always you. Everyone else on the call is separated by voi
 Separation works best with a headset and when people take turns. Heavy cross-talk can merge two
 people or split one person into two.
 
+### Teams captions and mute (recommended)
+
+With **Settings > Use Teams live captions for speaker names** on (the default), Notarius reads
+your Teams meeting window during a call:
+
+- **Captions → who said what.** Teams knows exactly who is speaking, and its live captions show
+  the name on every line. Notarius matches its own (more accurate) transcript to the captions by
+  time and words, so every line gets the real Teams name, marked *From Teams captions*. Teams'
+  caption text itself is not used. Names learned this way also teach Notarius the voices for
+  meetings without captions.
+- **Mute.** Anything your mic hears while Teams shows you muted is left out of your transcript.
+- **You don't need to do anything.** If captions aren't on 15 seconds into the call, Notarius
+  turns them on in your Teams window. Only you see them. You can also hide the caption panel;
+  Notarius reads it either way while it exists.
+
+Without captions (turned off, or Teams in a browser), Notarius falls back to voice separation and
+remembered voices.
+
 ## 6. Languages
 
 - **Spoken language.** The default, *Detect automatically*, works for any language and for
@@ -232,7 +250,51 @@ working. Without the PIN or the recovery key, the notes can't be recovered.
 The log is at `%LOCALAPPDATA%\Notarius\notetaker.log`. It records events and timings, never what
 was said.
 
-## 9. Uninstall
+## 9. FAQ
+
+**Do I have to turn on Teams captions in every meeting?**
+No. Notarius turns them on for you about 15 seconds into the call. Only you see them, and
+nobody is told. Turn this off under Settings if you don't want it.
+
+**Does anyone in the meeting know I'm taking notes?**
+No bot joins and Teams shows nothing. Tell people anyway, and follow your company's policy on
+recording.
+
+**Why use Teams' captions if their text is worse than Notarius's?**
+Only for *who* spoke and *when*. Teams knows that exactly; Notarius's own transcription is more
+accurate for *what* was said. The two are matched up.
+
+**I spoke while muted. Is that in my notes?**
+Not when captions/mute reading is on: your mic is ignored while Teams shows you muted. If it's
+off, use **Pause** for private side conversations.
+
+**Someone else's words appear under my name.**
+That's your mic hearing the call. Notarius removes it three ways: matching words, matching
+sound, and (with Teams captions) matching someone else's caption. A headset that doesn't leak
+helps most.
+
+**A person shows up as two speakers, or with the wrong name.**
+In the meeting's **People** tab, type the right name (give both voices the same name if they're
+one person) and save; the minutes are rewritten. If early meetings taught Notarius wrong names,
+use **Settings > Forget remembered voices**.
+
+**How long after a meeting are the minutes ready?**
+About a minute for a short call, and a few minutes for an hour (RTX 4050). Speaker names can
+follow a little later on long meetings.
+
+**What leaves my laptop?**
+Only the transcript text, which goes to Claude (Haiku) through your own Claude Code login to
+write the minutes. Audio, voices, and the notes themselves stay local and encrypted.
+
+**I forgot my PIN.**
+Use **Forgot your PIN?** on the lock screen with your recovery key. Without either, the notes
+can't be recovered.
+
+**Is there a backup?**
+Not yet. Notes live only on this laptop, and an encrypted cloud backup is on the roadmap. Until
+then, export important minutes to Word or PDF.
+
+## 10. Uninstall
 
 Right-click the tray icon and choose **Quit Notarius**, then run:
 

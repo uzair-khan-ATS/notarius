@@ -74,7 +74,32 @@ shared clock. This keeps the two tracks aligned in time.
 
    Your remaining words are regrouped into sentences at pauses, so talk time is measured from
    words, not from Whisper's 30-second batches.
-5. **Speaker labels.** Separation uses sherpa-onnx with pyannote segmentation 3.0 and WeSpeaker
+5. **Teams mute and captions.** While recording, a `TeamsObserver` thread reads the Teams meeting
+   window once a second through Windows UI Automation:
+   - It finds the window by the mic button's automation id (`microphone-button`). The button's
+     label ("Unmute mic" while muted) gives a muted/unmuted timeline.
+   - The live captions panel, found from `captions-panel-dismiss-button`, yields
+     `(speaker, text)` pairs (each entry is a group of two texts). They're merged across polls
+     with first-seen and last-changed times.
+   - If no captions panel appears within 15 s, the observer invokes `closed-captions-button`
+     once.
+   - The data is sealed into `teams.json` and handed to the processing child as a temporary plain
+     copy.
+
+   Processing then:
+   - drops your mic words inside muted stretches;
+   - finds which caption name is you (the name whose caption words appear on your mic rather than
+     in the call audio);
+   - drops mic words that are someone else's captioned speech.
+
+   Each call-audio word takes the speaker of the caption showing at that moment (caption window
+   `[t0 - 3 s, t1 + 1 s]`) that contains the word. Words the captions don't decide take the
+   majority caption name of their voice cluster, or else stay with the cluster. Caption names
+   also enroll voices for meetings without captions.
+
+   In a simulated 4-person call with rough captions (25% of words dropped, 10% misheard), 17 of
+   17 lines were attributed correctly, and the line spoken while muted was dropped.
+6. **Speaker labels (without captions).** Separation uses sherpa-onnx with pyannote segmentation 3.0 and WeSpeaker
    ResNet34 embeddings, giving "who spoke when". Call-track words are assigned to speakers by
    their timestamps, and one-word flips at turn boundaries are smoothed out.
 
@@ -95,7 +120,7 @@ shared clock. This keeps the two tracks aligned in time.
 
    Recognition never merges voices. Voices are only remembered from speakers with at least 15 s
    of speech. Settings has **Forget remembered voices** to start over.
-6. **Minutes first, names later.** If separation isn't done 20 seconds after transcription, the
+7. **Minutes first, names later.** If separation isn't done 20 seconds after transcription, the
    minutes are written straight away with the call audio as "Others". They are rewritten with
    speakers when separation finishes. In practice this applies to long meetings, since
    separation runs at about 1/6 of real time.

@@ -1,7 +1,10 @@
 # Roadmap
 
-## Done (v1)
+## Done
 
+- **Teams mute and speaker names.** While recording, Notarius reads the Teams meeting window: the
+  mic button (anything your mic hears while you're muted is left out) and the live captions (who
+  is speaking). Captions are turned on automatically.
 - Records Teams desktop calls automatically and transcribes them locally on the GPU, in any
   language, including mixed English/Urdu/Hindi calls.
 - Speaker separation, with names remembered by voice.
@@ -11,18 +14,10 @@
 
 ## Next (in priority order)
 
-1. **Respect Teams mute (top priority).** Teams mute doesn't switch off the microphone device, so
-   today Notarius still records and transcribes you while you're muted, including private side
-   conversations. Planned flow:
-   - While recording, follow Teams' mute state. The Teams third-party app API, on a local
-     WebSocket that Teams exposes when it's enabled in Teams settings, reports `isMuted` in its
-     meeting updates. Notarius pairs with it once and logs a muted/unmuted timeline next to the
-     audio.
-   - When processing, words on your mic that fall inside a muted stretch are left out of the
-     transcript, the minutes and your talk time, the same way echo is removed today. The call
-     audio from everyone else is unaffected.
-   - If Teams' API isn't available, fall back to today's behaviour, and tell you so on the
-     meeting page, so nothing is silently lost.
+1. **Encrypted cloud backup.** Today the notes exist only on this laptop. Back them up
+   automatically to cloud storage (for example OneDrive or an S3 bucket), still encrypted with
+   your key, so a lost or reinstalled laptop doesn't lose your meetings. Restore with the
+   recovery key.
 2. **Its own app window instead of a browser tab.** Opening Notarius shows the dashboard in a
    window with the Notarius icon and its own taskbar entry, like any Windows app. Options: a native
    window with the built-in Edge WebView2 (for example pywebview), or Edge's app mode
