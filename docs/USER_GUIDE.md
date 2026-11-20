@@ -152,9 +152,12 @@ Your own microphone is always you. Everyone else on the call is separated by voi
   conversation*.
 - Type or confirm the names and click **Save names and update minutes**. The transcript and the
   minutes are rewritten with the names.
-- Notarius **remembers each named voice**. In later meetings the same person is labelled
-  automatically, marked *Recognized by voice*. If it guesses wrong, type the right name and
-  save; the wrong voice sample is forgotten.
+- Notarius **remembers each named voice** (from people with at least 15 seconds of speech). In
+  later meetings the same person is labelled automatically, marked *Recognized by voice*, but only
+  on a clear match. When unsure, Notarius leaves "Speaker N" rather than guess. If it guesses
+  wrong, type the right name and save; the wrong voice sample is forgotten.
+- **Settings > Remembered voices** lists who Notarius recognizes. **Forget remembered voices**
+  clears them all, which is useful if early meetings taught it wrong names.
 
 Separation works best with a headset and when people take turns. Heavy cross-talk can merge two
 people or split one person into two.

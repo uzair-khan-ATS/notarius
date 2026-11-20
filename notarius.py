@@ -99,7 +99,7 @@ SEG_MODEL_URL = ("https://github.com/k2-fsa/sherpa-onnx/releases/download/speake
 EMB_MODEL_URL = ("https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/"
                  "wespeaker_en_voxceleb_resnet34_LM.onnx")
 CLUSTER_THRESHOLD = float(os.environ.get("NOTETAKER_CLUSTER_THRESHOLD", "0.5"))  # higher = fewer speakers
-VOICE_MATCH = float(os.environ.get("NOTETAKER_VOICE_MATCH", "0.5"))  # cosine similarity to auto-name
+VOICE_MATCH = float(os.environ.get("NOTETAKER_VOICE_MATCH", "0.75"))  # cosine similarity to auto-name (different people measured up to 0.83 on short clips)
 VOICE_SAMPLES_PER_PERSON = 20
 
 SPOKEN_LANGUAGES = {"auto": None, "en": "en", "ur": "ur", "hi": "hi"}
@@ -790,24 +790,38 @@ def speaker_profiles(audio, turns, threads: int) -> dict[str, dict]:
     return out
 
 
+VOICE_MARGIN = 0.08       # ...and must beat the next-best remembered person by this much
+VOICE_MIN_S = 15.0        # fingerprints from less speech than this are too noisy to name or remember
+
+
 def recognize_voices(speakers: dict[str, dict]) -> None:
-    """Name speakers whose voice matches someone you named in an earlier meeting."""
+    """Name speakers whose voice matches someone you named in an earlier meeting.
+
+    A wrong name is worse than no name (it also hides who really spoke), so a voice is only named
+    when it clearly matches one remembered person, has enough speech for a stable fingerprint,
+    and each remembered person names at most one voice in the meeting (the best match)."""
     import numpy as np
 
     voices = read_voices()
-    for sp in speakers.values():
-        if not sp.get("embedding"):
+    claims = []  # (score, label, name)
+    for lab, sp in speakers.items():
+        if not sp.get("embedding") or sp.get("seconds", 0) < VOICE_MIN_S:
             continue
         v = np.asarray(sp["embedding"], dtype=np.float32)
-        best, score = None, 0.0
-        for name, samples in voices.items():
-            for sample in samples.values():
-                s = float(np.dot(v, np.asarray(sample, dtype=np.float32)))
-                if s > score:
-                    best, score = name, s
+        per_name = sorted(((max(float(np.dot(v, np.asarray(x, dtype=np.float32))) for x in samples.values()), name)
+                           for name, samples in voices.items() if samples), reverse=True)
+        if not per_name:
+            continue
+        score, name = per_name[0]
+        runner_up = per_name[1][0] if len(per_name) > 1 else 0.0
         sp["match_score"] = round(score, 3)
-        if best and score >= VOICE_MATCH:
-            sp["name"], sp["auto"] = best, True
+        if score >= VOICE_MATCH and score - runner_up >= VOICE_MARGIN:
+            claims.append((score, lab, name))
+    taken = set()
+    for score, lab, name in sorted(claims, reverse=True):
+        if name not in taken:
+            taken.add(name)
+            speakers[lab]["name"], speakers[lab]["auto"] = name, True
 
 
 def split_by_speaker(segments, turns) -> list[dict]:
@@ -983,6 +997,83 @@ def remove_echo(mine: list[dict], call: list[dict]) -> tuple[list[dict], int]:
     return out, dropped
 
 
+_FRAME = 800              # 50 ms at 16 kHz
+
+
+def _envelope(x) -> "np.ndarray":
+    import numpy as np
+
+    n = len(x) // _FRAME
+    return np.sqrt((x[: n * _FRAME].reshape(n, _FRAME) ** 2).mean(1)) if n else np.zeros(0)
+
+
+def echo_envelopes(mic_audio, call_audio):
+    """Loudness envelopes with each track's background noise floor removed (hiss would otherwise
+    count as 'unexplained' and hide quiet echo)."""
+    import numpy as np
+
+    out = []
+    for x in (mic_audio, call_audio):
+        env = _envelope(x)
+        floor = float(np.percentile(env, 10)) if len(env) else 0.0
+        env = np.clip(env - floor, 0, None)
+        # ~250 ms smoothing: room reverb smears fine detail, not the rise and fall of speech
+        out.append(np.convolve(env, np.ones(5) / 5, mode="same") if len(env) >= 5 else env)
+    return out
+
+
+class EchoModel:
+    """How the call leaks into your mic, measured once per meeting: the delay, and the coupling
+    (how loud leaked call audio is on the mic) - set by your speakers, mic and room, so constant.
+
+    For a mic sentence, whatever loudness exceeds coupling x call is your own voice; if your own
+    voice is only a small share of the sentence, the sentence is leaked call audio. Talking over
+    someone keeps your words, because your voice is the excess."""
+
+    def __init__(self, mic_audio, call_audio, max_lag: int = 12):
+        import numpy as np
+
+        self.mic, call = echo_envelopes(mic_audio, call_audio)
+        n = min(len(self.mic), len(call))
+        self.mic = self.mic[:n]
+        best = (-1.0, 0)
+        for lag in range(max_lag + 1):  # one delay for the whole meeting
+            c = np.concatenate([np.zeros(lag), call[: n - lag]])
+            denom = float(np.linalg.norm(c) * np.linalg.norm(self.mic))
+            r = float(c @ self.mic) / denom if denom else 0.0
+            best = max(best, (r, lag))
+        lag = best[1]
+        self.call = np.concatenate([np.zeros(lag), call[: n - lag]])
+        active = self.call > 0.05 * (self.call.max() or 1.0)
+        ratios = self.mic[active] / self.call[active] if active.any() else np.zeros(0)
+        # most of the time the call is loud, the mic only hears it: the typical ratio is the coupling
+        self.coupling = float(np.percentile(ratios, 40)) if len(ratios) else 0.0
+
+    def own_share(self, s: float, e: float) -> float:
+        import numpy as np
+
+        a, b = int(s * 16000) // _FRAME, min(int(e * 16000) // _FRAME + 1, len(self.mic))
+        m = self.mic[a:b]
+        total = float((m ** 2).sum())
+        if len(m) < 2 or total <= 0:
+            return 1.0
+        own = np.clip(m - 1.5 * self.coupling * self.call[a:b], 0, None)  # allowance for level variation
+        return float((own ** 2).sum()) / total
+
+
+ECHO_OWN_MIN = 0.45       # a mic sentence needs at least this share of your own voice to be kept
+
+
+def remove_acoustic_echo(mine: list[dict], mic_audio, call_audio) -> tuple[list[dict], int]:
+    """Drop mic sentences that are mostly the call audio leaking in, whatever words Whisper made
+    of them (leaked speech is often misheard as other words or another language)."""
+    if call_audio is None or not len(mine):
+        return mine, 0
+    model = EchoModel(mic_audio, call_audio)
+    kept = [s for s in mine if model.own_share(s["start"], s["end"]) >= ECHO_OWN_MIN]
+    return kept, len(mine) - len(kept)
+
+
 def speaker_label(who: str, speakers: dict, me: str) -> str:
     if who == "ME":
         return me
@@ -1037,6 +1128,18 @@ def _usable(f: Path) -> bool:
     return f.exists() and f.stat().st_size >= 48_000
 
 
+def _invented(seg) -> bool:
+    """Whisper's own confidence says this segment is text made up from noise or leftover echo:
+    no letters at all, very likely not speech and decoded with low confidence, very low
+    confidence overall, or the repetitive output of a decoding loop."""
+    if not re.search(r"\w", seg.text):
+        return True
+    nsp = getattr(seg, "no_speech_prob", 0.0) or 0.0
+    lp = getattr(seg, "avg_logprob", 0.0) or 0.0
+    cr = getattr(seg, "compression_ratio", 1.0) or 1.0
+    return (nsp > 0.6 and lp < -0.7) or lp < -1.2 or cr > 2.4
+
+
 class Transcriber:
     """Whisper on one device. Each stretch of speech is transcribed in the language it's
     spoken in, so a call that moves between English and Urdu (or any other language) is
@@ -1062,7 +1165,7 @@ class Transcriber:
             segs = list(self.model.transcribe(audio, vad_filter=True, condition_on_previous_text=False, **common)[0])
         return [{"start": round(s.start + offset, 2), "end": round(s.end + offset, 2), "text": s.text.strip(),
                  "words": [(round(w.start + offset, 2), round(w.end + offset, 2), w.word) for w in s.words or []]}
-                for s in segs if s.text.strip()]
+                for s in segs if s.text.strip() and not _invented(s)]
 
     _SA = "hi/ur"  # Hindi and Urdu: one spoken language that Whisper labels either way
 
@@ -1121,6 +1224,16 @@ class Transcriber:
             if lang_of[i] is None:
                 lang_of[i] = next((lang_of[j] for j in range(i - 1, -1, -1) if lang_of[j]), None) or \
                              next((lang_of[j] for j in range(i + 1, len(regions)) if lang_of[j]), None)
+        # A language heard for only a few seconds is almost always a misdetection on noise or echo
+        # (it produced invented German on one call): keep only languages with a real share of speech.
+        dur: dict[str, int] = {}
+        for (s, e), fam in zip(regions, lang_of):
+            if fam:
+                dur[fam] = dur.get(fam, 0) + e - s
+        if dur:
+            total, main = sum(dur.values()), max(dur, key=dur.get)
+            keep = {f for f, n in dur.items() if n >= min(45 * sr, 0.2 * total) or f == main}
+            lang_of = [f if f in keep else main for f in lang_of]
         script = "hi" if votes.get("hi", 0) > votes.get("ur", 0) else "ur"  # one script per meeting
         runs: list[list] = []  # [start, end, language] of consecutive same-language sentences
         for (s, e), fam in zip(regions, lang_of):
@@ -1153,30 +1266,9 @@ def run_diarization(wav: Path, out: Path) -> None:
     speakers = speaker_profiles(audio, turns, threads)
     before = len(speakers)
     turns, speakers = merge_speakers(turns, speakers)
-    recognize_voices(speakers)
-    turns, speakers = merge_same_names(turns, speakers)
+    recognize_voices(speakers)  # names only; never merges, since a wrong name must not merge two people
     log(f"  speaker separation: {before} voice(s) found, {len(speakers)} after clean-up")
     write_json(out, {"turns": turns, "speakers": speakers})
-
-
-def merge_same_names(turns: list, speakers: dict[str, dict]) -> tuple[list, dict[str, dict]]:
-    """Two voices recognized as the same named person are one speaker."""
-    by_name: dict[str, str] = {}
-    alias: dict[str, str] = {}
-    for lab in sorted(speakers, key=lambda k: -speakers[k]["seconds"]):
-        name = speakers[lab].get("name")
-        if name and name in by_name:
-            keep = by_name[name]
-            alias[lab] = keep
-            speakers[keep]["seconds"] = round(speakers[keep]["seconds"] + speakers[lab]["seconds"], 1)
-        elif name:
-            by_name[name] = lab
-    if not alias:
-        return turns, speakers
-    kept = {k: v for k, v in speakers.items() if k not in alias}
-    order: dict[str, str] = {}
-    new_turns = [(s, e, order.setdefault(alias.get(lab, lab), f"S{len(order) + 1}")) for s, e, lab in turns]
-    return new_turns, {order[k]: v for k, v in kept.items() if k in order}
 
 
 def _start_diarization(meeting_dir: Path):
@@ -1364,16 +1456,24 @@ def _transcribe_and_write(meeting_dir: Path, device: str) -> None:
         tr = Transcriber(device)
         mine: list[dict] = []
         call: list[dict] = []
+        mic_audio = call_audio = None
         if _usable(meeting_dir / "mic.wav"):
             log(f"transcribing your mic ({WHISPER_MODEL} on {device})")
-            mine = tr.track(decode_audio(str(meeting_dir / "mic.wav"), sampling_rate=16000), words=True)
+            mic_audio = decode_audio(str(meeting_dir / "mic.wav"), sampling_rate=16000)
+            mine = tr.track(mic_audio, words=True)
         if _usable(meeting_dir / "others.wav"):
             log(f"transcribing the call audio ({WHISPER_MODEL} on {device})")
-            call = tr.track(decode_audio(str(meeting_dir / "others.wav"), sampling_rate=16000), words=True)
+            call_audio = decode_audio(str(meeting_dir / "others.wav"), sampling_rate=16000)
+            call = tr.track(call_audio, words=True)
         heard = sum(len(s["words"]) for s in mine)
         mine, echoed = remove_echo(mine, call)
         if echoed:
-            log(f"  removed {echoed} of {heard} words from your mic that were the call audio (echo)")
+            log(f"  removed {echoed} of {heard} words from your mic that matched the call audio (echo)")
+        if mic_audio is not None:
+            mine, leaked = remove_acoustic_echo(mine, mic_audio, call_audio)
+            if leaked:
+                log(f"  removed {leaked} mic sentence(s) whose sound was the call audio leaking in")
+            del mic_audio, call_audio
         del tr  # free the GPU before the (CPU) wait below
         log(f"transcribed in {time.monotonic() - t0:.0f}s")
     except BaseException:
@@ -1565,7 +1665,7 @@ def rename_speakers(d: Path, names: dict[str, str]) -> bool:
                 del voices[person]
         sp["name"], sp["auto"] = name, False
         sp.pop("suggested", None)
-        if name and sp.get("embedding"):
+        if name and sp.get("embedding") and sp.get("seconds", 0) >= VOICE_MIN_S:  # short = noisy fingerprint
             samples = voices.setdefault(name, {})
             samples[key] = sp["embedding"]
             while len(samples) > VOICE_SAMPLES_PER_PERSON:
@@ -1895,10 +1995,11 @@ class _Handler(BaseHTTPRequestHandler):
                 return self._send(200, {**STATE, "my_name": my_name()})
         if api == ["settings"]:
             s = settings()
+            voices = sorted(read_voices())
             return self._send(200, {"my_name": my_name() if my_name() != "Me" else "",
                                     "spoken_language": s.get("spoken_language", "auto"),
                                     "minutes_language": minutes_language(),
-                                    "minutes_languages": list(MINUTES_LANGUAGES)})
+                                    "minutes_languages": list(MINUTES_LANGUAGES), "voices": voices})
         if api == ["meetings"]:
             return self._send(200, list_meetings())
         if api == ["search"]:
@@ -1972,6 +2073,10 @@ class _Handler(BaseHTTPRequestHandler):
             return self._deny()
 
     def _post(self, api: list[str]) -> None:
+        if api == ["voices", "forget"]:
+            VOICES_FILE.unlink(missing_ok=True)
+            log("remembered voices forgotten")
+            return self._send(200, {"ok": True})
         if api == ["pause"]:
             with _state_lock:
                 STATE["paused"] = bool(self._json_body().get("paused"))

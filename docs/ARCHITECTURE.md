@@ -55,12 +55,25 @@ shared clock. This keeps the two tracks aligned in time.
    `BatchedInferencePipeline`, at about 1 minute per hour of audio on an RTX 4050. It falls back
    to sequential decoding on error, and to int8 on the CPU if CUDA fails.
 4. **Echo removal on your mic.** Your microphone also hears the call (speakers, or a headset that
-   leaks), and Teams mute doesn't mute the device. Both tracks are transcribed with word
-   timestamps. A run of two or more words on your mic that matches call-audio words within
-   ±1.5 s is the call leaking in, and is dropped. A single matching word is a coincidence, which
-   keeps your own words when you talk over someone. One- or two-word leftovers inside call speech
-   are dropped too. Your remaining words are regrouped into sentences at pauses, so talk time is
-   measured from words, not from Whisper's 30-second batches.
+   leaks), and Teams mute doesn't mute the device. There are two independent layers:
+   - **Words.** Both tracks are transcribed with word timestamps. A run of two or more words on
+     your mic that matches call-audio words within ±1.5 s is dropped. A single matching word is a
+     coincidence and is kept.
+   - **Sound.** This catches leaked speech that Whisper mishears as other words or another
+     language. Notarius measures once per meeting how the call leaks into the mic: the delay, and
+     the coupling (how loud the call is on the mic), which your speakers, mic and room keep
+     constant. For each mic sentence, loudness above `1.5 × coupling × call` is your own voice. A
+     sentence with less than 45% of your own voice is dropped.
+
+   Talking over someone keeps your words, because your voice is the excess. In tests, leaked
+   audio scored at most 0.33, talking over someone 0.57, and plain speech 1.00.
+
+   Segments that Whisper itself marks as unlikely are discarded: high no-speech probability with
+   low confidence, very low confidence, or repetitive output. A language heard for only a few
+   seconds (under 20% of the speech and under 45 s) is treated as a misdetection.
+
+   Your remaining words are regrouped into sentences at pauses, so talk time is measured from
+   words, not from Whisper's 30-second batches.
 5. **Speaker labels.** Separation uses sherpa-onnx with pyannote segmentation 3.0 and WeSpeaker
    ResNet34 embeddings, giving "who spoke when". Call-track words are assigned to speakers by
    their timestamps, and one-word flips at turn boundaries are smoothed out.
@@ -70,11 +83,18 @@ shared clock. This keeps the two tracks aligned in time.
    - voices with under 5 s of speech fold into the voice they resemble most;
    - voices whose averaged fingerprints are ≥ 0.86 similar merge (different people measured up
      to 0.83);
-   - voices recognized as the same named person merge.
-
    On a synthetic test with varying audio this took 4 people from 6 speakers to 4, and 2 people
-   from 3 to 2. Each speaker's fingerprint is compared with the voices you have named before
-   (cosine ≥ 0.5) to name them automatically.
+   from 3 to 2.
+
+   **Recognizing named voices.** A wrong name is worse than no name, so a voice is named only when
+   all of these hold:
+   - it has at least 15 s of speech;
+   - its fingerprint is at least 0.75 similar to one remembered person;
+   - that person beats the next-best by at least 0.08;
+   - each remembered person names at most one voice per meeting.
+
+   Recognition never merges voices. Voices are only remembered from speakers with at least 15 s
+   of speech. Settings has **Forget remembered voices** to start over.
 6. **Minutes first, names later.** If separation isn't done 20 seconds after transcription, the
    minutes are written straight away with the call audio as "Others". They are rewritten with
    speakers when separation finishes. In practice this applies to long meetings, since

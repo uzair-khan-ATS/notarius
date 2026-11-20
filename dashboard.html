@@ -374,6 +374,10 @@ body.print .pmeta { color: var(--muted); margin-bottom: 14px; }
     <b style="font-size:14px">Recovery key</b>
     <p style="margin:6px 0 10px;font-size:13px">Resets a forgotten PIN. Creating a new one makes the old one stop working.</p>
     <button class="btn" type="button" id="new-rk">Create a new recovery key</button>
+    <hr>
+    <b style="font-size:14px">Remembered voices</b>
+    <p style="margin:6px 0 10px;font-size:13px" id="voices-list">None yet. Name people in a meeting's People tab and their voices are remembered.</p>
+    <button class="btn" type="button" id="forget-voices">Forget remembered voices</button>
     <div class="err" id="set-err" role="alert" style="margin-top:12px"></div>
     <div class="row"><button class="btn" type="button" id="settings-cancel">Cancel</button><button class="btn primary" type="submit">Save</button></div>
   </form>
@@ -1045,9 +1049,21 @@ $("#open-settings").onclick = async () => {
   await loadSettings(); const s = S.settings || {};
   $("#set-name").value = s.my_name || ""; $("#set-spoken").value = s.spoken_language || "auto"; $("#set-minutes").value = s.minutes_language || "English";
   $("#set-old").value = ""; $("#set-new").value = ""; $("#set-err").textContent = "";
+  showVoices();
   $("#settings").hidden = false; $("#set-name").focus();
 };
 $("#settings-cancel").onclick = () => { $("#settings").hidden = true; };
+$("#forget-voices").onclick = async () => {
+  if (!confirm("Forget every remembered voice? Future meetings will show Speaker 1, 2... until you name people again. Names already in past meetings stay.")) return;
+  const r = await api("/api/voices/forget", { method: "POST" });
+  if (r.ok) { toast("Remembered voices forgotten."); await loadSettings(); showVoices(); }
+};
+function showVoices() {
+  const v = (S.settings && S.settings.voices) || [];
+  $("#voices-list").textContent = v.length ? `Notarius recognizes: ${v.join(", ")}. If people were named wrongly, forget them and name them again in a new meeting.`
+    : "None yet. Name people in a meeting's People tab and their voices are remembered.";
+  $("#forget-voices").disabled = !v.length;
+}
 $("#new-rk").onclick = async () => {
   if (!confirm("Create a new recovery key? The old one will stop working.")) return;
   const r = await api("/api/auth/recovery-key", { method: "POST" });
