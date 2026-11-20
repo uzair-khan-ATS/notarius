@@ -21,13 +21,15 @@ joins the call, and nobody has to send you the transcript.
 - **Minutes and action items.** Each meeting gets a summary, discussion by topic with decisions,
   and an action-items table with owner and due date. A one-hour meeting is ready a few minutes
   after you leave.
-- **Calendar dashboard** at http://127.0.0.1:8765:
-  - pick a day or drag across a range to see its meetings and open action items;
-  - tick action items off as they're done;
+- **Its own app window**, like any Windows app, with the Notarius icon on the taskbar:
+  - your meetings, newest first, each with a summary, topics, who spoke, and a dot on new minutes;
+  - each meeting's summary with decisions highlighted, talk time per speaker, and a transcript you
+    can search;
+  - all action items in one list, with owners and due dates, to tick off (or just yours);
+  - search everything with **Ctrl+K**, and jump to any day or range in the calendar;
   - keep notes per meeting and per day;
-  - search everything;
-  - export to **Word** or **PDF**;
-  - take a guided tour with the **?** button.
+  - export to **Word** or **PDF**, with the Notarius logo, header and page numbers;
+  - a guided tour: **Take the tour** in the sidebar.
 - **Private by default.** A **4-digit PIN** locks the dashboard. Notes and transcripts are
   **encrypted on disk** and stored in the app's private folder, not in Documents. A **recovery key**
   resets a forgotten PIN.

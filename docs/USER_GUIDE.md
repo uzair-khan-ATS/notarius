@@ -38,15 +38,19 @@ cd notarius
 uv run --script notarius.py install
 ```
 
-`install` adds **Notarius** to the Start menu, the Desktop and your login items. It works with
-**Smart App Control** turned on, because it launches through `uvw.exe`, which is signed.
+`install` adds **Notarius** to the Start menu, the Desktop and your login items, and lists it in
+**Settings > Apps > Installed apps**. It works with **Smart App Control** turned on, because it
+launches through `uvw.exe`, which is signed.
 
 ### Option B: Notarius.exe
 
 Download `Notarius.exe` from the
-[releases page](https://github.com/uzair-khan-ATS/notarius/releases) and double-click it. On first
-run it creates the same shortcuts. You still need uv and Claude Code; if uv is missing, it opens
-the uv download page.
+[releases page](https://github.com/uzair-khan-ATS/notarius/releases) and double-click it. Like
+other per-user Windows apps it needs no admin rights: it installs itself to
+`%LOCALAPPDATA%\Programs\Notarius`, adds the same shortcuts, and lists Notarius in **Settings >
+Apps > Installed apps**, where you can uninstall it. To update, run a newer `Notarius.exe`; your
+meetings are kept. You still need uv and Claude Code; if uv is missing, it opens the uv download
+page.
 
 > **Smart App Control.** Windows 11's Smart App Control blocks unsigned programs, and
 > `Notarius.exe` isn't code-signed. Where Smart App Control is on, use Option A. Turning Smart App
@@ -55,17 +59,17 @@ the uv download page.
 
 ### The first start
 
-The first start downloads the speech models once, about 3 GB, so the dashboard can take a few
-minutes to appear. After that Notarius starts in seconds.
+The first start downloads the speech models once, about 3 GB, so the window can take a few
+minutes to appear. After that Notarius opens in about a second.
 
 ## 2. First start: PIN and recovery key
 
-1. The dashboard opens at **http://127.0.0.1:8765** and asks you to **choose a 4-digit PIN**.
+1. The Notarius window opens and asks you to **choose a 4-digit PIN**.
    Each digit moves to the next box automatically. Enter the PIN a second time to confirm it.
 2. Notarius shows your **recovery key**, for example `7K2Q-M9XD-4TRP-H8WC-2VNE-QJ6B`. **Write it on
    paper** or save it in a password manager. It is the only way back in if you forget your PIN,
    and it isn't shown again. Tick *I've written down my recovery key*, then **Continue**.
-3. A short guided tour starts. Replay it any time with the **?** button.
+3. A short guided tour starts. Replay it any time with **Take the tour** at the bottom of the sidebar.
 4. Open **Settings** (gear icon) to set:
    - your name, used instead of "Me" in transcripts and action items;
    - the language people speak in your calls;
@@ -88,9 +92,10 @@ letter N inside. The pen is the scribe's, the *notarius* the app is named after.
 The tray icon is under **^** next to the clock. You can drag it onto the taskbar to keep it
 visible.
 
-- **Click** the icon to open the dashboard.
+- **Click** the icon to open the Notarius window (or bring it to the front).
 - **Right-click** it for the menu:
-  - **Open dashboard**;
+  - **Open Notarius**;
+  - **Open in browser**, the same dashboard in your browser at http://127.0.0.1:8765;
   - the current status;
   - **Pause note-taking**, which stops and discards a call that's being recorded;
   - **Quit Notarius**.
@@ -112,35 +117,43 @@ Calls shorter than a minute, such as a mic test, are discarded.
 
 ## 4. The dashboard
 
-Open it from the tray, the Start menu, or the Desktop shortcut. Every reload asks for your PIN.
+Open it from the tray, the Start menu, or the Desktop shortcut. Every time it opens, it asks for
+your PIN.
 
-**Calendar (left).** Days with meetings show a count. Click a day, **drag across days** to pick a
-range, or use the quick ranges: Today, Yesterday, This week, Last 7 days, This month, All.
+**Sidebar (left).**
 
-**Overview (right).** For the selected days you see:
+- **Search** (or **Ctrl+K** anywhere) finds any word across all minutes, transcripts and your
+  notes. Use the arrow keys and Enter to open a result.
+- **Status:** green while it listens for Teams, red with a timer while it records, amber while it
+  writes the minutes. **Pause** sits right next to it and does the same as in the tray.
+- **Meetings** and **Action items**, the two pages. The counts show new minutes and open items.
+- **Calendar:** dots mark days with meetings. Click a day, or **drag across days** to pick a range;
+  **Show all** clears it.
+- **Take the tour** replays the guided tour.
+- At the bottom: the **moon/sun** button switches between light and dark (until you pick one,
+  Notarius follows your Windows setting), the **gear** opens Settings, and the **padlock** locks
+  Notarius at once.
 
-- each meeting with its time, length, participants, a **summary** and the topics;
-- **Open action items** from all those meetings, with owner and due date. Tick them off as
-  they're done, and use **Show completed** to see them again;
-- **Notes for the day**, a free-text box, when one day is selected;
-- **Word** and **PDF** buttons that export every meeting in the selection into one document.
+**Meetings.** Your meetings, newest first, grouped by day. Each shows its time and length, a short
+summary, its topics, who spoke, and how many action items are done. A **blue dot** marks minutes
+you haven't opened yet. Use **All / Today / This week / This month** to narrow the list, and
+**Export** to put every meeting in the list into one Word or PDF document. On the right: the open
+action items and a notes box for the day.
 
 **Meeting page.** Click a meeting to open it.
 
-- **People in this meeting:** who spoke and for how long. See [section 5](#5-people-and-speaker-names).
-- **Minutes:** a summary, the discussion by topic, and decisions marked **Decision:**. Switch
-  between **English** and **Roman Urdu** here. The first switch takes a few seconds; switching
-  back is instant.
+- **Summary:** the summary, **talk time** per speaker, and the discussion by topic, with
+  **decisions** highlighted in green. Switch between **English** and **Roman Urdu** here. The
+  first switch takes a few seconds; switching back is instant.
+- **Transcript:** each speaker with their own colour and timestamps. The search box shows only the
+  lines that match.
 - **Action items:** a checklist.
-- **Transcript:** time-stamped, colour-coded by speaker.
+- **People:** who spoke and for how long. See [section 5](#5-people-and-speaker-names).
 - **My notes:** your own notes, saved automatically and included in exports.
-- **Copy minutes** to paste into Teams chat, Outlook or Word, or export to **Word** or **PDF**.
+- **Copy** to paste the minutes into Teams chat, Outlook or Word, or **Export** to Word or PDF.
 
-**Search** (top bar) finds any word across all minutes, transcripts and your notes.
-
-**Pause** (top bar) does the same as in the tray. **Lock** (padlock) locks the dashboard at once.
-The **moon/sun** button switches between light and dark; until you pick one, Notarius follows your
-Windows setting. The **gear** opens Settings.
+**Action items.** Every action item from every meeting, grouped by meeting. Choose **Mine** to see
+only yours, and **All** to include the ones already done.
 
 ## 5. People and speaker names
 
@@ -211,10 +224,11 @@ The encryption key is protected by your PIN *and* by your Windows account, so th
 useless on another computer or account. New meetings are encrypted as they're saved, even while
 the dashboard is locked.
 
-**Locking.** The dashboard asks for the PIN:
+**Locking.** Notarius asks for the PIN:
 
-- on every reload or new tab;
-- after you've been away from the tab for more than 1 minute;
+- every time you open its window (closing the window locks it; Notarius keeps running in the tray);
+- in a browser, on every reload or new tab, and after you've been away from the tab for more than
+  1 minute;
 - after 5 minutes without activity;
 - whenever Windows is locked (Win+L, sleep, switching users).
 
@@ -296,12 +310,10 @@ then, export important minutes to Word or PDF.
 
 ## 10. Uninstall
 
-Right-click the tray icon and choose **Quit Notarius**, then run:
+Open **Settings > Apps > Installed apps**, find **Notarius**, and choose **Uninstall**. (With the
+script install you can also run `uv run --script notarius.py uninstall`.)
 
-```powershell
-uv run --script notarius.py uninstall
-```
-
-This removes the shortcuts and the login item. Your meetings stay in
-`%LOCALAPPDATA%\Notarius\Meetings`. Delete that folder to remove them. The models are in
-`%LOCALAPPDATA%\Notarius\models`.
+Notarius closes itself first, saving a call it is recording. It then removes its shortcuts, its
+login item and its Settings entry, and asks whether to also delete your meetings, remembered
+voices and speech models. The answer defaults to **No**: they stay in
+`%LOCALAPPDATA%\Notarius` for a later reinstall.

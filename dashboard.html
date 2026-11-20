@@ -4,323 +4,561 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Notarius</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"%3E%3Crect x="4" y="4" width="56" height="56" rx="14" fill="%234f46e5"/%3E%3Cg fill="%23fff"%3E%3Cpath d="M17 17h5v30h-5z"/%3E%3Cpath d="M12.5 45.5h14v3.5h-14z"/%3E%3Cpath d="M12.5 15h13.5v3.5h-13.5z"/%3E%3Cpath d="M17 15h10l20.5 26h-8z"/%3E%3Cpath d="M37.5 15h14v3.5h-14z"/%3E%3Cpath d="M42 17h5v18l1.6 6-4.1 10.5-4.1-10.5 1.6-6z"/%3E%3C/g%3E%3Cpath d="M44.5 51.5v-9" stroke="%234f46e5" stroke-width="1.3"/%3E%3Ccircle cx="44.5" cy="41.5" r="1.6" fill="%234f46e5"/%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
 <style>
+/* ===================================================================== design tokens */
 :root {
-  --bg: #f4f5f7; --panel: #ffffff; --text: #1f2328; --muted: #667085; --faint: #98a2b3;
-  --line: #e4e7ec; --line-strong: #d0d5dd; --hover: #f2f4f7;
-  --accent: #4f46e5; --accent-hover: #4338ca; --accent-soft: #eef2ff; --accent-line: #c7d2fe;
-  --ok: #067647; --ok-soft: #ecfdf3; --warn: #b54708; --warn-soft: #fffaeb;
-  --bad: #b42318; --bad-soft: #fef3f2; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
-  --radius: 12px;
+  color-scheme: light;
+  --bg: #ffffff; --bg-subtle: #f7f7f8; --panel: #ffffff; --raised: #ffffff;
+  --text: #18181b; --text-2: #3f3f46; --muted: #71717a; --faint: #a1a1aa;
+  --line: #ececef; --line-strong: #dcdce1; --hover: #f4f4f5; --active: #ebebee;
+  --accent: #4f46e5; --accent-hover: #4338ca; --accent-soft: #eef0ff; --accent-line: #c7cbfa; --accent-text: #4338ca;
+  --ok: #15803d; --ok-soft: #effaf2; --warn: #b45309; --warn-soft: #fff8eb; --bad: #dc2626; --bad-soft: #fef2f2;
+  --shadow-sm: 0 1px 2px rgba(24,24,27,.05);
+  --shadow-md: 0 1px 3px rgba(24,24,27,.06), 0 6px 20px rgba(24,24,27,.07);
+  --shadow-lg: 0 2px 6px rgba(24,24,27,.08), 0 24px 60px rgba(24,24,27,.18);
+  --scrim: rgba(24,24,27,.42);
+  --r-sm: 6px; --r: 9px; --r-lg: 14px;
+  --sb-w: 252px;
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
-:root { color-scheme: light; }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0f1115; --panel: #171a21; --text: #e6e8ec; --muted: #9aa3b2; --faint: #6b7280;
-  --line: #262b35; --line-strong: #353b47; --hover: #1f2430;
-  --accent: #8187f7; --accent-hover: #6b72f2; --accent-soft: #23264a; --accent-line: #3d4280;
-  --ok: #4ade80; --ok-soft: #13301f; --warn: #fbbf24; --warn-soft: #33280f;
-  --bad: #f87171; --bad-soft: #3a1919; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 1px 3px rgba(0,0,0,.5);
+  --bg: #111113; --bg-subtle: #0b0b0d; --panel: #161619; --raised: #1c1c20;
+  --text: #ededf0; --text-2: #c8c8cf; --muted: #8d8d97; --faint: #5d5d67;
+  --line: #222227; --line-strong: #2e2e35; --hover: #1b1b1f; --active: #25252b;
+  --accent: #818cf8; --accent-hover: #6f7bf5; --accent-soft: #1d1c3a; --accent-line: #34318a; --accent-text: #a5b4fc;
+  --ok: #4ade80; --ok-soft: #0d2617; --warn: #fbbf24; --warn-soft: #2a200a; --bad: #f87171; --bad-soft: #2b1313;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-md: 0 1px 3px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  --shadow-lg: 0 2px 8px rgba(0,0,0,.5), 0 24px 64px rgba(0,0,0,.6);
+  --scrim: rgba(0,0,0,.6);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #0f1115; --panel: #171a21; --text: #e6e8ec; --muted: #9aa3b2; --faint: #6b7280;
-    --line: #262b35; --line-strong: #353b47; --hover: #1f2430;
-    --accent: #8187f7; --accent-hover: #6b72f2; --accent-soft: #23264a; --accent-line: #3d4280;
-    --ok: #4ade80; --ok-soft: #13301f; --warn: #fbbf24; --warn-soft: #33280f;
-    --bad: #f87171; --bad-soft: #3a1919; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 1px 3px rgba(0,0,0,.5);
+    --bg: #111113; --bg-subtle: #0b0b0d; --panel: #161619; --raised: #1c1c20;
+    --text: #ededf0; --text-2: #c8c8cf; --muted: #8d8d97; --faint: #5d5d67;
+    --line: #222227; --line-strong: #2e2e35; --hover: #1b1b1f; --active: #25252b;
+    --accent: #818cf8; --accent-hover: #6f7bf5; --accent-soft: #1d1c3a; --accent-line: #34318a; --accent-text: #a5b4fc;
+    --ok: #4ade80; --ok-soft: #0d2617; --warn: #fbbf24; --warn-soft: #2a200a; --bad: #f87171; --bad-soft: #2b1313;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+    --shadow-md: 0 1px 3px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.5), 0 24px 64px rgba(0,0,0,.6);
+    --scrim: rgba(0,0,0,.6);
   }
 }
+
+/* ===================================================================== base */
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html, body { margin: 0; }
-body { background: var(--bg); color: var(--text); font: 14px/1.55 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
-button, input, textarea { font: inherit; color: inherit; }
-button { cursor: pointer; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: 14px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: 0; padding: 0; }
+button:disabled { cursor: default; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+svg.i { width: 16px; height: 16px; flex: none; }
+::selection { background: var(--accent-line); }
+kbd { font: 500 11px/1 var(--font); color: var(--muted); border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 5px; padding: 3px 5px; background: var(--panel); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--faint); }
 
-/* ---------- top bar */
-.top { position: sticky; top: 0; z-index: 5; height: 60px; background: var(--panel); border-bottom: 1px solid var(--line);
-       display: flex; align-items: center; gap: 16px; padding: 0 20px; }
-.brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 16px; white-space: nowrap; }
-.brand svg { width: 30px; height: 30px; }
-.brand .word { font-family: "Cinzel", "Trajan Pro", "Times New Roman", Georgia, serif; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; font-size: 17px; color: var(--text); }
-.state { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted);
-         background: var(--hover); border-radius: 999px; padding: 4px 12px; white-space: nowrap; }
-.state .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
-.state.rec { background: var(--bad-soft); color: var(--bad); font-weight: 600; }
-.state.rec .dot { background: var(--bad); animation: pulse 1.2s infinite; }
-.state.busy { background: var(--warn-soft); color: var(--warn); }
-.state.busy .dot { background: var(--warn); }
-.state.off .dot { background: var(--faint); }
-@keyframes pulse { 50% { opacity: .25; } }
-.search { margin-left: auto; position: relative; width: min(420px, 45vw); }
-.search input { width: 100%; height: 38px; border: 1px solid var(--line-strong); border-radius: 10px; padding: 0 12px 0 36px; background: var(--panel); }
-.search svg { position: absolute; left: 11px; top: 11px; width: 16px; height: 16px; color: var(--faint); }
+/* buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 34px; padding: 0 13px; border-radius: var(--r);
+       border: 1px solid var(--line-strong); background: var(--panel); font-weight: 550; font-size: 13px; white-space: nowrap; box-shadow: var(--shadow-sm);
+       transition: background .12s, border-color .12s; }
+.btn:hover:not(:disabled) { background: var(--hover); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+:root[data-theme="dark"] .btn.primary { color: #0b0b1f; }
+.btn.ghost { border-color: transparent; background: transparent; box-shadow: none; }
+.btn.ghost:hover:not(:disabled) { background: var(--hover); }
+.btn.danger { color: var(--bad); }
+.btn:disabled { opacity: .45; }
+.btn.sm { height: 28px; padding: 0 10px; font-size: 12.5px; }
+.icon-btn { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: var(--r-sm); color: var(--muted); transition: background .12s, color .12s; }
+.icon-btn:hover { background: var(--active); color: var(--text); }
+.linkbtn { color: var(--accent-text); font-weight: 600; font-size: 13px; }
+.linkbtn:hover { text-decoration: underline; }
 
-/* ---------- layout */
-.layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; padding: 20px; max-width: 1400px; margin: 0 auto; align-items: start; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
-.side { position: sticky; top: 80px; padding: 16px; }
-main { min-width: 0; }
+/* avatars */
+.av { --c: #64748b; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; flex: none;
+      background: color-mix(in srgb, var(--c) 16%, var(--panel)); color: var(--c); font: 650 10px/1 var(--font); letter-spacing: .02em;
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 28%, transparent) inset; }
+:root[data-theme="dark"] .av { background: color-mix(in srgb, var(--c) 28%, var(--panel)); color: color-mix(in srgb, var(--c) 55%, #fff); }
+.av.lg { width: 32px; height: 32px; font-size: 12px; }
+.av-stack { display: inline-flex; align-items: center; }
+.av-stack .av { box-shadow: 0 0 0 2px var(--bg); margin-left: -6px; }
+.av-stack .av:first-child { margin-left: 0; }
+.av-more { font-size: 12px; color: var(--muted); margin-left: 6px; }
 
-/* ---------- calendar */
-.cal-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
-.cal-head .month { flex: 1; font-weight: 650; font-size: 15px; }
-.icon-btn { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; width: 32px; height: 32px; display: grid; place-items: center; }
-.icon-btn:hover { background: var(--hover); }
-.text-btn { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; height: 32px; padding: 0 10px; font-size: 13px; }
-.text-btn:hover { background: var(--hover); }
-.grid { display: grid; grid-template-columns: repeat(7, 1fr); user-select: none; }
-.dow { text-align: center; font-size: 11px; font-weight: 600; color: var(--faint); padding: 6px 0; }
-.day { position: relative; height: 40px; border: 0; background: transparent; font-size: 13px; color: var(--text); }
-.day span.num { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; }
-.day:hover span.num { background: var(--hover); }
+/* badges */
+.badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap;
+         background: var(--hover); color: var(--muted); }
+.badge.rec { background: var(--bad-soft); color: var(--bad); }
+.badge.rec::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse 1.2s infinite; }
+.badge.busy { background: var(--warn-soft); color: var(--warn); }
+.badge.bad { background: var(--bad-soft); color: var(--bad); }
+.badge.ok { background: var(--ok-soft); color: var(--ok); }
+.badge.accent { background: var(--accent-soft); color: var(--accent-text); }
+.spin { width: 11px; height: 11px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 50% { opacity: .3; } }
+
+/* ===================================================================== app shell */
+.app { display: grid; grid-template-columns: var(--sb-w) minmax(0, 1fr); height: 100vh; }
+.sb { background: var(--bg-subtle); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; padding: 14px 12px 10px; gap: 14px; }
+.sb-brand { display: flex; align-items: center; gap: 9px; padding: 2px 6px; font: 650 15.5px/1 var(--font-display); letter-spacing: -.01em; }
+.sb-brand svg { width: 26px; height: 26px; }
+.sb-search { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 8px 0 10px; border-radius: var(--r); border: 1px solid var(--line-strong);
+             background: var(--panel); color: var(--muted); font-size: 13px; box-shadow: var(--shadow-sm); }
+.sb-search:hover { border-color: var(--faint); color: var(--text-2); }
+.sb-search span { flex: 1; text-align: left; }
+
+/* live status */
+.status { border: 1px solid var(--line); background: var(--panel); border-radius: var(--r-lg); padding: 11px 12px; display: grid; grid-template-columns: auto 1fr auto; gap: 2px 10px; align-items: center; box-shadow: var(--shadow-sm); }
+.status .st-dot { grid-row: span 2; width: 9px; height: 9px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px var(--ok-soft); }
+.status .st-title { font-weight: 600; font-size: 13px; line-height: 1.3; }
+.status .st-sub { grid-column: 2; font-size: 12px; color: var(--muted); line-height: 1.35; }
+.status .st-btn { grid-row: 1 / span 2; grid-column: 3; height: 26px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--line-strong); font-size: 12px; font-weight: 600; display: inline-flex; gap: 5px; align-items: center; }
+.status .st-btn:hover { background: var(--hover); }
+.status .st-btn svg { width: 12px; height: 12px; }
+.status.rec { border-color: color-mix(in srgb, var(--bad) 35%, var(--line)); background: color-mix(in srgb, var(--bad-soft) 60%, var(--panel)); }
+.status.rec .st-dot { background: var(--bad); box-shadow: 0 0 0 4px color-mix(in srgb, var(--bad) 18%, transparent); animation: pulse 1.2s infinite; }
+.status.rec .st-title { color: var(--bad); font-variant-numeric: tabular-nums; }
+.status.busy .st-dot { background: var(--warn); box-shadow: 0 0 0 4px var(--warn-soft); }
+.status.paused .st-dot, .status.off .st-dot { background: var(--faint); box-shadow: 0 0 0 4px var(--hover); }
+.status.paused .st-btn { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* navigation */
+.nav { display: flex; flex-direction: column; gap: 1px; }
+.nav-item { display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 9px; border-radius: var(--r-sm); color: var(--text-2); font-weight: 500; font-size: 13.5px; }
+.nav-item:hover { background: var(--active); color: var(--text); }
+.nav-item.on { background: var(--active); color: var(--text); font-weight: 600; }
+.nav-item svg { color: var(--muted); }
+.nav-item.on svg { color: var(--accent); }
+.nav-count { margin-left: auto; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.nav-count.hot { background: var(--accent-soft); color: var(--accent-text); border-radius: 999px; padding: 1px 7px; font-weight: 650; }
+
+/* mini calendar */
+.cal { padding: 4px 2px 0; }
+.cal-head { display: flex; align-items: center; gap: 2px; padding: 0 4px 4px; }
+.cal-head .month { flex: 1; font-weight: 600; font-size: 12.5px; color: var(--text-2); }
+.cal-head .icon-btn { width: 24px; height: 24px; }
+.grid { display: grid; grid-template-columns: repeat(7, 1fr); user-select: none; row-gap: 1px; }
+.dow { text-align: center; font-size: 10.5px; font-weight: 600; color: var(--faint); padding: 4px 0; }
+.day { position: relative; height: 30px; font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.day .num { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; }
+.day:hover .num { background: var(--active); }
 .day.out { color: var(--faint); }
-.day.today span.num { box-shadow: inset 0 0 0 1.5px var(--accent); font-weight: 650; }
+.day.today .num { color: var(--accent-text); font-weight: 700; }
+.day.has::after { content: ""; position: absolute; left: 50%; bottom: 1px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--accent); opacity: .85; }
 .day.in-range { background: var(--accent-soft); }
-.day.in-range.first { border-radius: 20px 0 0 20px; }
-.day.in-range.last { border-radius: 0 20px 20px 0; }
-.day.in-range.first.last { border-radius: 20px; }
-.day.edge span.num, .day.single span.num { background: var(--accent); color: #fff; }
-.day .count { position: absolute; top: 2px; right: 3px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
-              background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; line-height: 16px; }
-.day.edge .count, .day.single .count { background: #fff; color: var(--accent); box-shadow: 0 0 0 1px var(--accent-line); }
-.ranges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-.chip { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 11px; font-size: 12.5px; }
-.chip:hover { background: var(--hover); }
-.chip.on { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); font-weight: 600; }
-.hint { font-size: 12px; color: var(--faint); margin-top: 10px; }
-.side-foot { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.day.in-range.first { border-radius: 15px 0 0 15px; }
+.day.in-range.last { border-radius: 0 15px 15px 0; }
+.day.in-range.first.last { border-radius: 15px; }
+.day.edge .num, .day.single .num { background: var(--accent); color: #fff; font-weight: 650; }
+.day.edge.has::after, .day.single.has::after { background: var(--accent); }
+.cal-foot { display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; color: var(--faint); padding: 6px 6px 0; min-height: 22px; }
 
-/* ---------- main content */
-.page-head { display: flex; align-items: flex-end; gap: 16px; margin: 4px 0 16px; flex-wrap: wrap; }
-.page-head h1 { font-size: 24px; line-height: 1.25; margin: 0; letter-spacing: -.01em; }
-.page-head .sub { color: var(--muted); margin-top: 4px; }
-.page-head .tools { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
-.btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 9px;
-       border: 1px solid var(--line-strong); background: var(--panel); font-weight: 550; font-size: 13px; }
-.btn:hover { background: var(--hover); }
-.btn.primary { background: var(--accent-hover); border-color: var(--accent-hover); color: #fff; }
-.btn.primary:hover { filter: brightness(1.08); }
-.btn.primary:hover { background: var(--accent-hover); }
-.btn:disabled { opacity: .5; cursor: default; }
-.btn svg { width: 15px; height: 15px; }
-.section { margin-bottom: 20px; }
-.section > h2 { font-size: 13px; font-weight: 650; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
-.section > h2 .n { background: var(--hover); color: var(--muted); border-radius: 999px; padding: 0 8px; font-size: 12px; letter-spacing: 0; }
-
-.mtg { display: grid; grid-template-columns: 76px 1fr auto; gap: 14px; width: 100%; text-align: left; padding: 14px 16px;
-       border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: var(--shadow); margin-bottom: 10px; }
-.mtg:hover { border-color: var(--accent-line); background: var(--hover); }
-.mtg .time { font-weight: 650; font-variant-numeric: tabular-nums; }
-.mtg .dur { color: var(--muted); font-size: 12px; }
-.mtg .title { font-weight: 650; font-size: 15px; }
-.mtg .meta { color: var(--muted); font-size: 12.5px; margin-top: 3px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
-.mtg .topics { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
-.mtg .right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-.pill { font-size: 11.5px; font-weight: 650; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
-.pill.recording { background: var(--bad-soft); color: var(--bad); }
-.pill.processing { background: var(--warn-soft); color: var(--warn); }
-.pill.failed { background: var(--bad-soft); color: var(--bad); }
-.pill.done { background: var(--ok-soft); color: var(--ok); }
-.pill.plain { background: var(--hover); color: var(--muted); }
-
-.empty { text-align: center; color: var(--muted); padding: 40px 20px; }
-.empty b { display: block; color: var(--text); font-size: 15px; margin-bottom: 4px; }
-
-/* action items */
-.actions { padding: 6px 0; }
-.act { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: start; padding: 10px 16px; border-top: 1px solid var(--line); }
-.act:first-child { border-top: 0; }
-.act input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--accent); cursor: pointer; }
-.act .what { font-weight: 500; }
-.act.done .what { text-decoration: line-through; color: var(--faint); }
-.act .who { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
-.act .from { font-size: 12px; color: var(--accent); background: none; border: 0; padding: 0; text-align: right; }
-.act .from:hover { text-decoration: underline; }
-.owner-me { color: var(--accent); font-weight: 600; }
-.toggle-done { font-size: 12.5px; color: var(--muted); background: none; border: 0; padding: 8px 16px; }
-
-textarea.notes { width: 100%; min-height: 160px; resize: vertical; border: 1px solid var(--line-strong); border-radius: 10px; padding: 12px; background: var(--panel); line-height: 1.55; }
-.save-state { font-size: 12px; color: var(--faint); height: 18px; margin-top: 4px; }
-
-/* ---------- meeting detail */
-.back { border: 0; background: none; color: var(--accent); font-weight: 600; padding: 0; margin-bottom: 10px; display: inline-flex; align-items: center; gap: 4px; }
-.banner { border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; display: flex; gap: 12px; align-items: center; }
-.banner.bad { background: var(--bad-soft); color: var(--bad); }
-.banner.warn { background: var(--warn-soft); color: var(--warn); }
-.banner .btn { margin-left: auto; }
-.people { padding: 14px 16px; margin-bottom: 16px; }
-.people-line { color: var(--muted); font-size: 13.5px; margin: -4px 0 14px; }
-.people-line .linkbtn { font-size: 13.5px; }
-.people-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-.people-head b { font-size: 15px; }
-.people-head span { color: var(--muted); font-size: 12.5px; }
-.person { display: grid; grid-template-columns: 12px 200px 1fr; gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
-.person:first-of-type { border-top: 0; }
-.person .sw { width: 12px; height: 12px; border-radius: 50%; }
-.person input { width: 100%; height: 34px; border: 1px solid var(--line-strong); border-radius: 8px; padding: 0 10px; background: var(--panel); }
-.person .info { font-size: 12.5px; color: var(--muted); min-width: 0; }
-.person .info q { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
-.badge { font-size: 11px; font-weight: 650; border-radius: 6px; padding: 1px 6px; margin-right: 6px; }
-.badge.voice { background: var(--ok-soft); color: var(--ok); }
-.badge.sugg { background: var(--accent-soft); color: var(--accent); }
-.people-foot { display: flex; justify-content: flex-end; margin-top: 10px; }
-
-.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
-.tab { border: 0; background: none; padding: 10px 14px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
-.tab:hover { color: var(--text); }
-.tab.on { color: var(--accent); border-bottom-color: var(--accent); }
-.doc { padding: 8px 24px 20px; }
-.md h2 { font-size: 17px; margin: 22px 0 8px; }
-.md h3 { font-size: 15px; margin: 18px 0 6px; }
-.md ul { padding-left: 20px; margin: 6px 0; }
-.md li { margin: 3px 0; }
-.md p { margin: 8px 0; }
-.md table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 13px; }
-.md th, .md td { border: 1px solid var(--line); padding: 7px 9px; text-align: left; vertical-align: top; }
-.md th { background: var(--hover); }
-.md code { background: var(--hover); padding: 1px 5px; border-radius: 5px; }
-.tr { padding: 6px 8px; }
-.tr-line { display: grid; grid-template-columns: 70px 140px 1fr; gap: 10px; padding: 8px 12px; border-radius: 8px; }
-.tr-line:hover { background: var(--hover); }
-.tr-time { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; padding-top: 2px; }
-.tr-who { font-weight: 650; font-size: 13px; overflow-wrap: anywhere; }
-
-.results .res { display: block; width: 100%; text-align: left; border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
-.results .res:hover { border-color: var(--accent-line); }
-.results .res .t { font-weight: 650; }
-.results .res .s { color: var(--muted); font-size: 13px; margin-top: 3px; }
-.results mark { color: #111; background: #fef08a; border-radius: 3px; padding: 0 1px; }
-
-.top-actions { display: flex; gap: 6px; }
-.top-btn { height: 38px; min-width: 38px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--panel);
-           display: inline-flex; align-items: center; gap: 6px; font-weight: 550; font-size: 13px; }
-.top-btn:hover { background: var(--hover); }
-.top-btn svg { width: 18px; height: 18px; }
+.sb-spacer { flex: 1; }
+.sb-foot { display: flex; align-items: center; gap: 4px; padding: 8px 4px 0; border-top: 1px solid var(--line); }
+.sb-foot .me { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; font-size: 13px; font-weight: 550; }
+.sb-foot .me span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .theme-dark-icon { display: none; }
 :root[data-theme="dark"] .theme-dark-icon { display: block; }
 :root[data-theme="dark"] .theme-light-icon { display: none; }
-.top-btn.paused { background: var(--warn-soft); border-color: #fedf89; color: var(--warn); }
-.state.paused { background: var(--warn-soft); color: var(--warn); }
-.state.paused .dot { background: var(--warn); }
-.mtg .summary { color: var(--text); font-size: 13.5px; margin-top: 6px; line-height: 1.5; }
-.mtg .read { color: var(--accent); font-size: 12.5px; font-weight: 600; margin-top: 8px; display: inline-block; }
-.lede { font-size: 15px; line-height: 1.6; background: var(--accent-soft); border: 1px solid var(--accent-line); border-radius: 10px; padding: 12px 14px; margin: 4px 0 8px; }
-.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 9px; overflow: hidden; }
-.seg button { border: 0; background: var(--panel); padding: 6px 12px; font-size: 13px; font-weight: 550; color: var(--muted); }
-.seg button + button { border-left: 1px solid var(--line-strong); }
-.seg button.on { background: var(--accent-soft); color: var(--accent); }
-.doc-bar { display: flex; align-items: center; gap: 10px; justify-content: flex-end; margin-bottom: 10px; font-size: 13px; color: var(--muted); }
 
-/* auth + settings overlays */
-.overlay { position: fixed; inset: 0; z-index: 20; background: var(--bg); display: grid; place-items: center; padding: 16px; }
-.overlay.modal { background: rgba(16,24,40,.45); }
-.dialog { width: min(420px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 20px 40px rgba(16,24,40,.15); padding: 28px; }
-.dialog.wide { width: min(520px, 100%); }
-.dialog .logo { width: 44px; height: 44px; margin-bottom: 14px; }
-.dialog h2 { margin: 0 0 6px; font-size: 20px; }
-.dialog .logo { width: 52px; height: 52px; }
-.dialog p { color: var(--muted); margin: 0 0 18px; }
+/* ===================================================================== main area */
+.main { overflow-y: auto; min-width: 0; }
+.page { max-width: 1180px; margin: 0 auto; padding: 28px 40px 64px; }
+.page.narrow { max-width: 900px; }
+.ph { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
+.ph h1 { font: 650 26px/1.2 var(--font-display); letter-spacing: -.02em; margin: 0; }
+.ph-sub { color: var(--muted); margin-top: 5px; font-size: 13.5px; }
+.ph-tools { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* segmented control */
+.seg { display: inline-flex; padding: 2px; border-radius: var(--r); background: var(--hover); border: 1px solid var(--line); }
+.seg button { height: 28px; padding: 0 11px; border-radius: 7px; font-size: 12.5px; font-weight: 550; color: var(--muted); }
+.seg button:hover:not(:disabled) { color: var(--text); }
+.seg button.on { background: var(--panel); color: var(--text); box-shadow: var(--shadow-sm), 0 0 0 1px var(--line); }
+.seg button:disabled { opacity: .5; }
+
+.filter-chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 6px 0 11px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-text); font-size: 12.5px; font-weight: 600; }
+.filter-chip button { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; }
+.filter-chip button:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+
+/* dropdown menu */
+.menu-wrap { position: relative; }
+.menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 15; min-width: 200px; padding: 5px; border-radius: var(--r); background: var(--raised);
+        border: 1px solid var(--line); box-shadow: var(--shadow-md); }
+.menu button { display: flex; align-items: center; gap: 9px; width: 100%; height: 34px; padding: 0 10px; border-radius: 6px; font-size: 13px; text-align: left; }
+.menu button:hover { background: var(--hover); }
+.menu button svg { color: var(--muted); }
+.menu .menu-note { font-size: 11.5px; color: var(--faint); padding: 6px 10px 4px; }
+
+/* home: feed + rail */
+.home { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 36px; align-items: start; }
+.day-group { margin-bottom: 26px; }
+.dg-h { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; padding: 0 4px; font: 650 13px/1.3 var(--font); color: var(--text); }
+.dg-h span { color: var(--faint); font-weight: 500; }
+.mlist { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); overflow: hidden; box-shadow: var(--shadow-sm); }
+.mrow { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 16px; width: 100%; text-align: left; padding: 14px 16px; border-top: 1px solid var(--line); transition: background .12s; }
+.mrow:first-child { border-top: 0; }
+.mrow:hover { background: var(--hover); }
+.mrow-time { font-variant-numeric: tabular-nums; padding-top: 1px; }
+.mrow-time b { display: block; font-weight: 600; font-size: 13.5px; }
+.mrow-time span { font-size: 12px; color: var(--muted); }
+.mrow-title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14.5px; line-height: 1.35; letter-spacing: -.005em; }
+.mrow-title .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrow-sum { color: var(--text-2); font-size: 13px; line-height: 1.5; margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mrow-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin-top: 9px; font-size: 12px; color: var(--muted); }
+.mrow-meta .who { display: inline-flex; align-items: center; gap: 7px; }
+.topics { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.topic { font-size: 11.5px; font-weight: 500; padding: 2px 9px; border-radius: 999px; background: var(--bg-subtle); border: 1px solid var(--line); color: var(--text-2);
+         max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.new-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+.mrow.unread .mrow-title .t { font-weight: 700; }
+.mrow-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; padding-top: 1px; }
+.progress { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.progress i { width: 34px; height: 4px; border-radius: 4px; background: var(--active); overflow: hidden; position: relative; }
+.progress i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--p); background: var(--ok); border-radius: 4px; }
+
+/* rail cards */
+.rail { position: sticky; top: 28px; display: flex; flex-direction: column; gap: 16px; }
+.card { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); box-shadow: var(--shadow-sm); }
+.card-h { display: flex; align-items: center; gap: 8px; padding: 12px 14px 8px; font-weight: 650; font-size: 13px; }
+.card-h .n { color: var(--faint); font-weight: 500; }
+.card-h .linkbtn { margin-left: auto; font-size: 12.5px; }
+.rail .act { padding: 8px 14px; }
+.rail .act .what { font-size: 13px; }
+.rail .empty-mini { padding: 4px 14px 14px; color: var(--muted); font-size: 13px; }
+
+/* action items */
+.act { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 11px 16px; border-top: 1px solid var(--line); }
+.act:first-child, .card-h + .act { border-top: 0; }
+.cb { appearance: none; width: 17px; height: 17px; margin: 2px 0 0; border-radius: 5px; border: 1.5px solid var(--line-strong); background: var(--panel); cursor: pointer; display: grid; place-items: center; transition: .12s; }
+.cb:hover { border-color: var(--accent); }
+.cb:checked { background: var(--accent); border-color: var(--accent); }
+.cb:checked::after { content: ""; width: 9px; height: 5px; border: 2px solid #fff; border-top: 0; border-right: 0; transform: translate(0, -1px) rotate(-45deg); }
+.act .what { font-weight: 500; line-height: 1.45; }
+.act.done .what { text-decoration: line-through; color: var(--faint); }
+.act .who { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 5px; font-size: 12px; color: var(--muted); }
+.act .who .owner { display: inline-flex; align-items: center; gap: 5px; }
+.act .who .owner .av { width: 18px; height: 18px; font-size: 8.5px; }
+.act .who .me { color: var(--accent-text); font-weight: 600; }
+.due { display: inline-flex; align-items: center; gap: 4px; }
+.due svg { width: 12px; height: 12px; }
+.act .from { font-size: 12px; color: var(--muted); max-width: 220px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act .from:hover { color: var(--accent-text); text-decoration: underline; }
+.toggle-done { font-size: 12.5px; color: var(--muted); padding: 10px 16px; font-weight: 550; }
+.toggle-done:hover { color: var(--text); }
+.ag { margin-bottom: 20px; }
+.ag-h { display: flex; align-items: baseline; gap: 8px; padding: 0 4px 8px; }
+.ag-h button { font-weight: 650; font-size: 13.5px; text-align: left; }
+.ag-h button:hover { color: var(--accent-text); }
+.ag-h span { font-size: 12px; color: var(--faint); }
+
+/* notes */
+textarea.notes { width: 100%; min-height: 140px; resize: vertical; border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; background: var(--panel);
+                 line-height: 1.6; outline: none; transition: border-color .12s, box-shadow .12s; }
+textarea.notes:focus { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
+.rail textarea.notes { border: 0; border-top: 1px solid var(--line); border-radius: 0 0 var(--r-lg) var(--r-lg); min-height: 120px; background: transparent; }
+.rail textarea.notes:focus { box-shadow: none; }
+.save-state { font-size: 11.5px; color: var(--faint); font-weight: 500; margin-left: auto; }
+
+/* empty states */
+.empty { text-align: center; color: var(--muted); padding: 56px 24px; }
+.empty .ill { width: 44px; height: 44px; margin: 0 auto 14px; border-radius: 12px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-text); }
+.empty .ill svg { width: 22px; height: 22px; }
+.empty b { display: block; color: var(--text); font-size: 15px; font-weight: 650; margin-bottom: 4px; }
+.empty p { margin: 0 auto; max-width: 420px; font-size: 13.5px; }
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 640px; margin: 22px auto 0; text-align: left; }
+.steps div { border: 1px solid var(--line); border-radius: var(--r); padding: 12px; font-size: 12.5px; background: var(--panel); }
+.steps b { font-size: 13px; margin-bottom: 2px; }
+
+/* ===================================================================== meeting page */
+.crumbs { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; font-size: 13px; color: var(--muted); }
+.crumbs button { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-weight: 550; }
+.crumbs button:hover { color: var(--text); }
+.m-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+.m-head h1 { flex: 1; font: 700 28px/1.2 var(--font-display); letter-spacing: -.022em; margin: 0; }
+.m-head .ph-tools { padding-top: 2px; }
+.m-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); font-size: 13px; margin: -6px 0 20px; }
+.m-meta .mi { display: inline-flex; align-items: center; gap: 6px; }
+.m-meta .mi svg { width: 15px; height: 15px; }
+.m-meta .people-names { color: var(--text-2); }
+.banner { display: flex; gap: 12px; align-items: center; border-radius: var(--r); padding: 11px 14px; margin-bottom: 16px; font-size: 13px; font-weight: 500; }
+.banner.bad { background: var(--bad-soft); color: var(--bad); }
+.banner.warn { background: var(--warn-soft); color: var(--warn); }
+.banner.info { background: var(--accent-soft); color: var(--accent-text); }
+.banner .btn { margin-left: auto; }
+.tabs { position: sticky; top: 0; z-index: 4; display: flex; align-items: center; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 22px; background: var(--bg); }
+.tab { position: relative; height: 40px; padding: 0 12px; font-weight: 550; font-size: 13.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.tab:hover { color: var(--text); }
+.tab.on { color: var(--text); }
+.tab.on::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+.tab svg { width: 15px; height: 15px; color: var(--faint); }
+.tab.on svg { color: var(--accent); }
+.tab .n { font-size: 11.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.tab.on .n { color: var(--accent-text); }
+.tabs .tab-tools { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+
+/* the minutes document */
+.doc { max-width: 760px; }
+.summary-box { border: 1px solid var(--accent-line); background: var(--accent-soft); border-radius: var(--r-lg); padding: 14px 18px 15px; margin-bottom: 26px; }
+.summary-box .lbl { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-text); margin-bottom: 5px; }
+.summary-box p { margin: 0; font-size: 15px; line-height: 1.65; color: var(--text); }
+.doc.md { font-size: 14.5px; line-height: 1.7; color: var(--text-2); }
+.doc.md h2 { font: 650 17px/1.3 var(--font-display); color: var(--text); margin: 30px 0 10px; letter-spacing: -.01em; }
+.doc.md h3 { font: 650 15.5px/1.35 var(--font-display); color: var(--text); margin: 26px 0 8px; letter-spacing: -.01em; }
+.doc.md h3:first-child, .doc.md h2:first-child { margin-top: 0; }
+.doc.md ul, .doc.md ol { padding-left: 20px; margin: 6px 0 10px; }
+.doc.md li { margin: 4px 0; padding-left: 2px; }
+.doc.md li::marker { color: var(--faint); }
+.doc.md li.decision { list-style: none; margin: 8px 0 8px -20px; padding: 8px 12px 8px 34px; position: relative; border-radius: var(--r); background: var(--ok-soft); color: var(--text); }
+.doc.md li.decision::before { content: ""; position: absolute; left: 12px; top: 13px; width: 11px; height: 6px; border: 2px solid var(--ok); border-top: 0; border-right: 0; transform: rotate(-45deg); }
+.doc.md li.decision strong { color: var(--ok); }
+.doc.md p { margin: 8px 0; }
+.doc.md strong { color: var(--text); font-weight: 650; }
+.md table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 13px; }
+.md th, .md td { border: 1px solid var(--line); padding: 7px 9px; text-align: left; vertical-align: top; }
+.md th { background: var(--hover); }
+.md code { background: var(--hover); padding: 1px 5px; border-radius: 5px; font-family: var(--mono); font-size: .9em; }
+
+/* talk time */
+.talk { margin: -8px 0 28px; }
+.talk-h { display: flex; align-items: baseline; justify-content: space-between; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); margin-bottom: 8px; }
+.talk-bar { display: flex; gap: 2px; height: 8px; border-radius: 8px; overflow: hidden; }
+.talk-bar i { background: var(--c); min-width: 3px; }
+.talk-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+.talk-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.talk-legend span::before { content: ""; width: 8px; height: 8px; border-radius: 3px; background: var(--c); }
+.talk-legend b { color: var(--text-2); font-weight: 600; }
+.meter { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+.meter span { flex: 1; max-width: 160px; height: 5px; border-radius: 5px; background: var(--hover); overflow: hidden; }
+.meter span i { display: block; height: 100%; border-radius: 5px; background: var(--c); }
+
+/* transcript */
+.tr-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.input { height: 34px; border: 1px solid var(--line-strong); border-radius: var(--r); padding: 0 11px; background: var(--panel); outline: none; transition: border-color .12s, box-shadow .12s; }
+.input:focus { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
+.input-icon { position: relative; flex: 1; max-width: 340px; }
+.input-icon svg { position: absolute; left: 10px; top: 9px; color: var(--faint); }
+.input-icon .input { width: 100%; padding-left: 32px; }
+.tr-count { font-size: 12.5px; color: var(--muted); }
+.tr { max-width: 820px; }
+.tr-turn { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; padding: 10px 10px; border-radius: var(--r); }
+.tr-turn:hover { background: var(--hover); }
+.tr-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+.tr-who { font-weight: 650; font-size: 13.5px; }
+.tr-time { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.tr-text p { margin: 0 0 4px; line-height: 1.6; color: var(--text-2); }
+.tr mark, .pal mark { color: inherit; background: color-mix(in srgb, #facc15 45%, transparent); border-radius: 3px; padding: 0 1px; }
+
+/* people */
+.people-intro { color: var(--muted); font-size: 13px; margin: -6px 0 16px; max-width: 640px; }
+.person { display: grid; grid-template-columns: 32px 240px minmax(0, 1fr); gap: 14px; align-items: center; padding: 12px 16px; border-top: 1px solid var(--line); }
+.person:first-child { border-top: 0; }
+.person .input { width: 100%; }
+.person .info { font-size: 12.5px; color: var(--muted); min-width: 0; }
+.person .info q { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-2); margin-top: 2px; quotes: "“" "”"; }
+.tag { font-size: 11px; font-weight: 650; border-radius: 5px; padding: 1px 6px; margin-right: 6px; }
+.tag.voice { background: var(--ok-soft); color: var(--ok); }
+.tag.sugg { background: var(--accent-soft); color: var(--accent-text); }
+.people-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--line); }
+
+/* ===================================================================== overlays */
+.overlay { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; }
+.overlay.modal { background: var(--scrim); backdrop-filter: blur(2px); animation: fade .15s ease; }
+.overlay.screen { background: var(--bg-subtle); background-image: radial-gradient(ellipse 80% 60% at 50% -10%, var(--accent-soft), transparent 70%); }
+@keyframes fade { from { opacity: 0; } }
+@keyframes rise { from { opacity: 0; transform: translateY(6px) scale(.99); } }
+.dialog { width: min(400px, 100%); background: var(--raised); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow-lg); padding: 30px; animation: rise .18s ease; }
+.dialog .logo { width: 48px; height: 48px; margin-bottom: 18px; }
+.dialog h2 { margin: 0 0 6px; font: 650 21px/1.25 var(--font-display); letter-spacing: -.015em; }
+.dialog p { color: var(--muted); margin: 0 0 20px; }
+.dialog .btn { height: 38px; }
+.dialog .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
 .field { display: block; margin-bottom: 14px; }
 .field span { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
-.field input, .field select { width: 100%; height: 40px; border: 1px solid var(--line-strong); border-radius: 9px; padding: 0 12px; background: var(--panel); }
-.field small { display: block; color: var(--muted); font-size: 12px; margin-top: 5px; }
-.dialog .btn { height: 40px; }
-.dialog .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
-.warnbox { background: var(--warn-soft); color: var(--warn); border-radius: 9px; padding: 10px 12px; font-size: 13px; margin-bottom: 16px; }
-.err { color: var(--bad); font-size: 13px; min-height: 20px; margin: -4px 0 8px; }
-.dialog hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
-.pin { display: flex; gap: 12px; justify-content: center; margin: 6px 0 12px; }
-.pin input { width: 58px; height: 66px; text-align: center; font-size: 28px; font-weight: 650; border: 1.5px solid var(--line-strong);
-             border-radius: 12px; background: var(--panel); caret-color: var(--accent); }
+.field input, .field select { width: 100%; height: 38px; border: 1px solid var(--line-strong); border-radius: var(--r); padding: 0 12px; background: var(--panel); outline: none; transition: border-color .12s, box-shadow .12s; }
+.field input:focus, .field select:focus { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
+.field small { display: block; color: var(--muted); font-size: 12px; margin-top: 6px; line-height: 1.45; }
+.warnbox { background: var(--warn-soft); color: var(--warn); border-radius: var(--r); padding: 10px 12px; font-size: 12.5px; margin-bottom: 18px; line-height: 1.45; }
+.err { color: var(--bad); font-size: 13px; min-height: 20px; margin: -2px 0 8px; }
+.center { text-align: center; }
+.pin { display: flex; gap: 10px; justify-content: center; margin: 4px 0 12px; }
+.pin input { width: 56px; height: 64px; text-align: center; font: 650 26px/1 var(--font-display); border: 1.5px solid var(--line-strong); border-radius: 12px; background: var(--panel); caret-color: var(--accent); transition: border-color .12s, box-shadow .12s; }
 .pin input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
 .pin.shake { animation: shake .35s; }
-.lockstate { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; color: var(--muted); background: var(--hover); border-radius: 999px; padding: 6px 12px; margin: -6px auto 16px; width: fit-content; }
-.lockstate .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+@keyframes shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+.lockstate { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12.5px; color: var(--muted); background: var(--hover); border-radius: 999px; padding: 6px 12px; margin: -6px auto 18px; width: fit-content; }
+.lockstate .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
 .lockstate.rec { background: var(--bad-soft); color: var(--bad); font-weight: 600; }
 .lockstate.rec .dot { background: var(--bad); animation: pulse 1.2s infinite; }
-.about { font-size: 12.5px; color: var(--faint); margin: 14px 0 0; text-align: center; }
-.linkbtn { border: 0; background: none; color: var(--accent); font-weight: 600; padding: 0; font-size: 13px; }
-.linkbtn:hover { text-decoration: underline; }
-.center { text-align: center; }
-.rk { font: 600 20px/1.4 ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing: .06em; text-align: center;
-      background: var(--hover); border: 1px dashed var(--line-strong); border-radius: 10px; padding: 14px; margin: 6px 0 12px; user-select: all; }
-.check { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; margin: 12px 0 4px; cursor: pointer; }
-.check input { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--accent); flex: none; }
-.tour-spot { position: fixed; z-index: 30; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(16,24,40,.55); transition: all .25s ease; pointer-events: none; }
-.tour-card { position: fixed; z-index: 31; width: min(340px, calc(100vw - 32px)); background: var(--panel); border-radius: 14px; padding: 18px;
-             box-shadow: 0 16px 40px rgba(16,24,40,.25); transition: top .25s ease, left .25s ease; }
-.tour-card h3 { margin: 0 0 6px; font-size: 16px; }
+.lockstate.busy .dot { background: var(--warn); }
+.lockstate.off .dot { background: var(--faint); }
+.about { font-size: 12px; color: var(--faint); margin: 18px 0 0; text-align: center; line-height: 1.5; }
+.rk { font: 600 19px/1.4 var(--mono); letter-spacing: .06em; text-align: center; background: var(--hover); border: 1px dashed var(--line-strong); border-radius: var(--r); padding: 14px; margin: 6px 0 12px; user-select: all; }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; margin: 14px 0 4px; cursor: pointer; line-height: 1.45; }
+.check .cb { margin-top: 1px; }
+
+/* settings */
+#settings { overflow: auto; }
+.dialog.settings { width: min(960px, 100%); max-height: calc(100vh - 32px); padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+.set-head { padding: 24px 28px 0; }
+.set-head p { margin: 0 0 4px; font-size: 13.5px; }
+.set-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: grid; grid-template-columns: 1fr 1fr; gap: 0 32px; padding: 18px 28px 8px; }
+.set-col h3 { margin: 0 0 14px; font-size: 11.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--faint); }
+.set-col + .set-col { border-left: 1px solid var(--line); padding-left: 32px; }
+.set-group { margin-bottom: 22px; }
+.set-group > b { display: block; font-size: 14px; font-weight: 650; margin-bottom: 6px; }
+.set-group p { margin: 0 0 10px; font-size: 13px; }
+.set-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.set-pair .field { margin-bottom: 0; }
+.set-check { margin: 4px 0 14px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg-subtle); font-size: 13px; }
+.set-foot { display: flex; align-items: center; gap: 8px; padding: 14px 28px; border-top: 1px solid var(--line); background: var(--raised); }
+.set-foot #set-version { font-size: 12px; color: var(--faint); white-space: nowrap; }
+.set-foot .err { flex: 1; margin: 0; min-height: 0; text-align: right; }
+
+/* command palette */
+.overlay.pal-wrap { place-items: start center; padding-top: 12vh; }
+.pal { width: min(640px, 100%); background: var(--raised); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-lg); overflow: hidden; animation: rise .15s ease; }
+.pal-in { display: flex; align-items: center; gap: 10px; padding: 0 16px; border-bottom: 1px solid var(--line); }
+.pal-in svg { width: 18px; height: 18px; color: var(--faint); }
+.pal-in input::-webkit-search-cancel-button { appearance: none; }
+.pal-in input { flex: 1; height: 54px; border: 0; outline: none; background: transparent; font-size: 15.5px; }
+.pal-res { max-height: min(460px, 60vh); overflow-y: auto; padding: 6px; }
+.pal-sec { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); padding: 10px 10px 4px; }
+.pal-item { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 11px; align-items: start; width: 100%; text-align: left; padding: 9px 10px; border-radius: var(--r); }
+.pal-item svg { color: var(--faint); margin-top: 2px; }
+.pal-item .t { font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pal-item .s { font-size: 12.5px; color: var(--muted); margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pal-item .d { font-size: 12px; color: var(--faint); white-space: nowrap; padding-top: 1px; }
+.pal-item.on { background: var(--active); }
+.pal-item.on svg { color: var(--accent); }
+.pal-empty { padding: 26px; text-align: center; color: var(--muted); font-size: 13.5px; }
+.pal-foot { display: flex; gap: 14px; padding: 9px 14px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--faint); }
+
+/* tour + toast */
+.tour-scrim { position: fixed; inset: 0; z-index: 30; background: rgba(9,9,12,.55); pointer-events: none; }
+.tour-spot { position: fixed; z-index: 30; border-radius: 12px; pointer-events: none;
+             box-shadow: 0 0 0 2px var(--accent), 0 0 0 7px color-mix(in srgb, var(--accent) 22%, transparent); }
+.tour-card { position: fixed; z-index: 31; width: min(330px, calc(100vw - 32px)); background: var(--raised); border: 1px solid var(--line); border-radius: 14px; padding: 18px;
+             box-shadow: var(--shadow-lg); transition: top .25s ease, left .25s ease; }
+.tour-card h3 { margin: 0 0 6px; font: 650 15.5px/1.3 var(--font-display); }
 .tour-card p { margin: 0 0 14px; color: var(--muted); font-size: 13.5px; line-height: 1.55; }
 .tour-foot { display: flex; align-items: center; gap: 8px; }
 .tour-foot .count { color: var(--faint); font-size: 12px; margin-right: auto; }
-.tour-foot .btn { height: 32px; padding: 0 12px; }
-@keyframes shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+.tour-foot .btn { height: 30px; padding: 0 12px; }
+.toast { position: fixed; left: 50%; bottom: 24px; z-index: 40; background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 13px; font-weight: 500;
+         box-shadow: var(--shadow-lg); opacity: 0; transform: translate(-50%, 8px); transition: .2s; pointer-events: none; max-width: calc(100vw - 32px); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
 
-.toast { position: fixed; right: 20px; bottom: 20px; background: var(--text); color: var(--panel); padding: 10px 14px; border-radius: 10px;
-         font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.18); opacity: 0; transform: translateY(8px); transition: .2s; pointer-events: none; z-index: 10; }
-.toast.show { opacity: 1; transform: none; }
-
-@media (max-width: 900px) {
-  .layout { grid-template-columns: 1fr; padding: 12px; }
-  .side { position: static; }
-  .top { gap: 10px; padding: 0 12px; }
-  .state { display: none; }
-  .search { width: 100%; }
-  .person { grid-template-columns: 12px 1fr; }
-  .person .info { grid-column: 2; }
-  .tr-line { grid-template-columns: 56px 1fr; }
-  .tr-line .tr-text { grid-column: 1 / -1; }
-  .mtg { grid-template-columns: 60px 1fr; }
-  .mtg .right { grid-column: 1 / -1; flex-direction: row; align-items: center; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
 
-/* ---------- print / PDF */
-body.print { background: #fff; font-size: 11pt; }
+/* ===================================================================== responsive */
+@media (max-width: 1180px) {
+  .home { grid-template-columns: minmax(0, 1fr); }
+  .rail { position: static; display: grid; grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 980px) {
+  :root { --sb-w: 222px; }
+  .page { padding: 22px 24px 56px; }
+  .person { grid-template-columns: 32px minmax(0, 1fr); }
+  .person .info { grid-column: 2; }
+}
+@media (max-width: 760px) {
+  .app { grid-template-columns: 1fr; height: auto; }
+  .sb { border-right: 0; border-bottom: 1px solid var(--line); }
+  .cal, .sb-spacer { display: none; }
+  .main { overflow: visible; }
+  .rail { grid-template-columns: 1fr; }
+  .mrow { grid-template-columns: 52px minmax(0, 1fr); }
+  .mrow-side { grid-column: 2; flex-direction: row; align-items: center; }
+  .steps { grid-template-columns: 1fr; }
+  .set-body { grid-template-columns: 1fr; }
+  .set-col + .set-col { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 18px; }
+  .set-head, .set-body, .set-foot { padding-left: 18px; padding-right: 18px; }
+  .m-head { flex-direction: column; }
+}
+
+/* ===================================================================== print / PDF */
+body.print { background: #fff; font-size: 11pt; height: auto; }
 body.print .pdoc { max-width: 760px; margin: 0 auto; padding: 24px; }
 body.print .pdoc + .pdoc { break-before: page; }
 body.print h1 { font-size: 20pt; margin: 0 0 4px; }
 body.print .pmeta { color: var(--muted); margin-bottom: 14px; }
-@media print { .top, .layout, .toast { display: none !important; } body { background: #fff; } }
+body.print .pbrand { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; padding-bottom: 8px; border-bottom: 1px solid var(--line); color: #4f46e5; font-weight: 600; font-size: 11pt; }
+body.print .pbrand img { width: 24px; height: 24px; }
+body.print .pbrand span { color: var(--muted); font-weight: 400; font-size: 9pt; }
+body.print { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body.print h1, body.print .md h2, body.print .md h3 { color: #4f46e5; }
+body.print .md th { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+body.print .md tr { break-inside: avoid; }
+@page { margin: 16mm 14mm 18mm;
+  @bottom-center { content: "Minutes taken by Notarius   ·   Page " counter(page) " of " counter(pages);
+                   font: 8.5pt system-ui, "Segoe UI", sans-serif; color: #667085; } }
+@media print { .app, .toast { display: none !important; } body { background: #fff; } }
 </style>
 </head>
 <body>
-<header class="top" id="top">
-  <div class="brand">
-    <svg viewBox="0 0 64 64" aria-hidden="true"><rect x="4" y="4" width="56" height="56" rx="14" fill="#4f46e5"/><rect x="9" y="9" width="46" height="37" rx="10" fill="#fff"/><polygon points="19.50,35.29 13.52,42.68 12.44,47.49 10.00,58.50 19.83,52.97 24.12,50.55 29.46,42.68" fill="#fff"/><path d="M16.97 49.10L10.36 58.02" stroke="#4f46e5" stroke-width="1.4" stroke-linecap="round"/><circle cx="17.81" cy="47.98" r="1.7" fill="#4f46e5"/><g fill="#4f46e5"><polygon points="22.07,17.62 25.37,17.62 25.37,37.42 22.07,37.42"/><polygon points="19.10,36.43 28.34,36.43 28.34,38.74 19.10,38.74"/><polygon points="19.10,16.30 28.01,16.30 28.01,18.61 19.10,18.61"/><polygon points="22.07,16.30 28.67,16.30 41.87,38.74 36.59,38.74"/><polygon points="35.60,16.30 44.84,16.30 44.84,18.61 35.60,18.61"/><polygon points="38.57,17.62 41.87,17.62 41.87,38.74 38.57,38.74"/></g></svg>
-    <span class="word">Notarius</span>
-  </div>
-  <div class="state off" id="state"><span class="dot"></span><span id="state-text">Connecting...</span></div>
-  <label class="search">
-    <span class="sr">Search all meetings</span>
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="6"/><path d="m14 14 4 4"/></svg>
-    <input id="q" type="search" placeholder="Search all meetings, notes and transcripts" autocomplete="off">
-  </label>
-  <div class="top-actions">
-    <button class="top-btn" id="tour-btn" title="Take the tour" aria-label="Take the tour">
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="7.5"/><path d="M7.8 7.6a2.3 2.3 0 1 1 3.2 2.1c-.6.3-1 .8-1 1.4v.6"/><circle cx="10" cy="14.4" r=".6" fill="currentColor"/></svg></button>
-    <button class="top-btn" id="pause" title="Pause note-taking (a call in progress is stopped and not saved)">
-      <svg viewBox="0 0 20 20" fill="currentColor"><rect x="5" y="4" width="3.5" height="12" rx="1"/><rect x="11.5" y="4" width="3.5" height="12" rx="1"/></svg><span>Pause</span></button>
-    <button class="top-btn" id="open-settings" title="Settings" aria-label="Settings">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><circle cx="12" cy="12" r="3"/></svg></button>
-    <button class="top-btn" id="theme" title="Switch between light and dark" aria-label="Switch between light and dark">
-      <svg class="theme-light-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
-      <svg class="theme-dark-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
-    <button class="top-btn" id="lock" title="Lock the dashboard" aria-label="Lock">
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="9" width="12" height="8.5" rx="2"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9"/></svg></button>
-  </div>
-</header>
+<div class="app" id="app">
+  <aside class="sb" id="sidebar" aria-label="Notarius">
+    <div class="sb-brand">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect x="4" y="4" width="56" height="56" rx="14" fill="#4f46e5"/><rect x="9" y="9" width="46" height="37" rx="10" fill="#fff"/><polygon points="19.50,35.29 13.52,42.68 12.44,47.49 10.00,58.50 19.83,52.97 24.12,50.55 29.46,42.68" fill="#fff"/><path d="M16.97 49.10L10.36 58.02" stroke="#4f46e5" stroke-width="1.4" stroke-linecap="round"/><circle cx="17.81" cy="47.98" r="1.7" fill="#4f46e5"/><g fill="#4f46e5"><polygon points="22.07,17.62 25.37,17.62 25.37,37.42 22.07,37.42"/><polygon points="19.10,36.43 28.34,36.43 28.34,38.74 19.10,38.74"/><polygon points="19.10,16.30 28.01,16.30 28.01,18.61 19.10,18.61"/><polygon points="22.07,16.30 28.67,16.30 41.87,38.74 36.59,38.74"/><polygon points="35.60,16.30 44.84,16.30 44.84,18.61 35.60,18.61"/><polygon points="38.57,17.62 41.87,17.62 41.87,38.74 38.57,38.74"/></g></svg>
+      <span>Notarius</span>
+    </div>
+    <button class="sb-search" id="search-btn" type="button"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Search</span><kbd>Ctrl K</kbd></button>
+    <div class="status off" id="status-card" role="status" aria-live="polite">
+      <span class="st-dot"></span><div class="st-title" id="state-text">Connecting...</div><div class="st-sub" id="state-sub"></div>
+      <button class="st-btn" id="pause" type="button" title="Pause note-taking (a call in progress is stopped and not saved)"><span>Pause</span></button>
+    </div>
+    <nav class="nav" aria-label="Pages">
+      <button class="nav-item on" id="nav-meetings" data-page="meetings" type="button">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>Meetings<span class="nav-count" id="count-meetings"></span></button>
+      <button class="nav-item" id="nav-actions" data-page="actions" type="button">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="m8 12 3 3 5-6"/></svg>Action items<span class="nav-count" id="count-actions"></span></button>
+    </nav>
+    <div class="cal" id="mini-cal">
+      <div class="cal-head">
+        <span class="month" id="month"></span>
+        <button class="icon-btn" id="prev" type="button" aria-label="Previous month"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg></button>
+        <button class="icon-btn" id="next" type="button" aria-label="Next month"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg></button>
+      </div>
+      <div class="grid" id="grid"></div>
+      <div class="cal-foot" id="cal-foot"></div>
+    </div>
+    <div class="sb-spacer"></div>
+    <nav class="nav" aria-label="Help">
+      <button class="nav-item" id="tour-btn" type="button"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.3a2.6 2.6 0 1 1 3.6 2.4c-.7.3-1.1.9-1.1 1.6v.4"/><circle cx="12" cy="16.9" r=".6" fill="currentColor"/></svg>Take the tour</button>
+    </nav>
+    <div class="sb-foot" id="user-row">
+      <div class="me"><span class="av" id="me-avatar"></span><span id="me-name"></span></div>
+      <button class="icon-btn" id="theme" type="button" title="Switch between light and dark" aria-label="Switch between light and dark">
+        <svg class="i theme-light-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 13.5A8.5 8.5 0 1 1 10.5 3.5a6.6 6.6 0 0 0 10 10Z"/></svg>
+        <svg class="i theme-dark-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+      <button class="icon-btn" id="open-settings" type="button" title="Settings" aria-label="Settings"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4a2 2 0 0 0 .7 2.7l.2.1a2 2 0 0 1 1 1.7v.5a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.5a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      <button class="icon-btn" id="lock" type="button" title="Lock Notarius" aria-label="Lock"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg></button>
+    </div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
 
-<div class="overlay" id="auth" hidden>
+<div class="overlay screen" id="auth" hidden>
   <form class="dialog" id="auth-form" autocomplete="off">
     <svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><rect x="4" y="4" width="56" height="56" rx="14" fill="#4f46e5"/><rect x="9" y="9" width="46" height="37" rx="10" fill="#fff"/><polygon points="19.50,35.29 13.52,42.68 12.44,47.49 10.00,58.50 19.83,52.97 24.12,50.55 29.46,42.68" fill="#fff"/><path d="M16.97 49.10L10.36 58.02" stroke="#4f46e5" stroke-width="1.4" stroke-linecap="round"/><circle cx="17.81" cy="47.98" r="1.7" fill="#4f46e5"/><g fill="#4f46e5"><polygon points="22.07,17.62 25.37,17.62 25.37,37.42 22.07,37.42"/><polygon points="19.10,36.43 28.34,36.43 28.34,38.74 19.10,38.74"/><polygon points="19.10,16.30 28.01,16.30 28.01,18.61 19.10,18.61"/><polygon points="22.07,16.30 28.67,16.30 41.87,38.74 36.59,38.74"/><polygon points="35.60,16.30 44.84,16.30 44.84,18.61 35.60,18.61"/><polygon points="38.57,17.62 41.87,17.62 41.87,38.74 38.57,38.74"/></g></svg>
     <h2 id="auth-title">Notarius is locked</h2>
-    <p id="auth-sub">Enter your password to see your meetings.</p>
+    <p id="auth-sub">Enter your 4-digit PIN.</p>
     <div class="lockstate" id="lock-state" hidden></div>
     <div class="warnbox" id="auth-warn" hidden>Your notes and transcripts are encrypted with this PIN on this Windows account. If you forget it, they can't be recovered.</div>
     <div class="pin" id="pin" role="group" aria-label="4-digit PIN">
@@ -329,7 +567,7 @@ body.print .pmeta { color: var(--muted); margin-bottom: 14px; }
       <input type="password" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="PIN digit 3">
       <input type="password" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="PIN digit 4">
     </div>
-    <div class="err" id="auth-err" role="alert" style="text-align:center"></div>
+    <div class="err center" id="auth-err" role="alert"></div>
     <div class="center" id="forgot-wrap" hidden><button type="button" class="linkbtn" id="forgot">Forgot your PIN?</button></div>
     <div id="recover" hidden>
       <label class="field"><span>Recovery key</span><input id="rec-key" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"></label>
@@ -342,8 +580,8 @@ body.print .pmeta { color: var(--muted); margin-bottom: 14px; }
   </form>
 </div>
 
-<div class="overlay" id="rk-screen" hidden>
-  <div class="dialog">
+<div class="overlay screen" id="rk-screen" hidden>
+  <div class="dialog" style="width:min(460px,100%)">
     <h2>Save your recovery key</h2>
     <p>If you ever forget your PIN, this key is the only way back into your notes. <b>Write it down on paper</b> or save it in a password manager, and keep it somewhere safe. It won't be shown again.</p>
     <div class="rk" id="rk-code"></div>
@@ -351,66 +589,76 @@ body.print .pmeta { color: var(--muted); margin-bottom: 14px; }
       <button type="button" class="btn" id="rk-copy">Copy</button>
       <button type="button" class="btn" id="rk-download">Download as text file</button>
     </div>
-    <label class="check"><input type="checkbox" id="rk-ok"><span>I've written down my recovery key and put it somewhere safe.</span></label>
-    <button type="button" class="btn primary" style="width:100%;margin-top:10px" id="rk-done" disabled>Continue</button>
+    <label class="check"><input type="checkbox" class="cb" id="rk-ok"><span>I've written down my recovery key and put it somewhere safe.</span></label>
+    <button type="button" class="btn primary" style="width:100%;margin-top:12px" id="rk-done" disabled>Continue</button>
   </div>
 </div>
 
 <div class="overlay modal" id="settings" hidden>
-  <form class="dialog wide" id="settings-form" autocomplete="off">
-    <h2>Settings</h2>
-    <p>These apply to new meetings. To change the language of a meeting you already have, open it and switch the minutes language there.</p>
-    <label class="field"><span>Your name</span><input id="set-name" placeholder="Shown instead of “Me”" maxlength="40"></label>
-    <label class="field"><span>Language people speak in calls</span>
-      <select id="set-spoken"><option value="auto">Detect automatically</option><option value="en">English</option><option value="ur">Urdu</option><option value="hi">Hindi</option></select>
-      <small>Choose Urdu or Hindi if most of your calls are in that language and detection gets it wrong. Mixed English-Urdu calls usually work best with automatic detection.</small></label>
-    <label class="check" style="margin:0 0 14px"><input type="checkbox" id="set-captions"><span><b>Use Teams live captions for speaker names.</b> During a call Notarius turns on captions in your Teams window (only you see them) and reads who is speaking and whether you're muted. Teams' caption text isn't used; only who spoke and when.</span></label>
-    <label class="field"><span>Write minutes in</span>
-      <select id="set-minutes"><option>English</option><option>Roman Urdu</option></select></label>
-    <hr>
-    <b style="font-size:14px">Change PIN</b>
-    <label class="field" style="margin-top:10px"><span>Current PIN</span><input type="password" id="set-old" inputmode="numeric" maxlength="4" autocomplete="off"></label>
-    <label class="field"><span>New PIN</span><input type="password" id="set-new" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="4 digits"></label>
-    <hr>
-    <b style="font-size:14px">Recovery key</b>
-    <p style="margin:6px 0 10px;font-size:13px">Resets a forgotten PIN. Creating a new one makes the old one stop working.</p>
-    <button class="btn" type="button" id="new-rk">Create a new recovery key</button>
-    <hr>
-    <b style="font-size:14px">Remembered voices</b>
-    <p style="margin:6px 0 10px;font-size:13px" id="voices-list">None yet. Name people in a meeting's People tab and their voices are remembered.</p>
-    <button class="btn" type="button" id="forget-voices">Forget remembered voices</button>
-    <div class="err" id="set-err" role="alert" style="margin-top:12px"></div>
-    <div class="row"><button class="btn" type="button" id="settings-cancel">Cancel</button><button class="btn primary" type="submit">Save</button></div>
+  <form class="dialog settings" id="settings-form" autocomplete="off" aria-labelledby="set-title">
+    <header class="set-head">
+      <h2 id="set-title">Settings</h2>
+      <p>Meeting settings apply to new meetings. To change the language of a meeting you already have, open it and switch the minutes language there.</p>
+    </header>
+    <div class="set-body">
+      <section class="set-col" aria-labelledby="set-h-meetings">
+        <h3 id="set-h-meetings">Meetings</h3>
+        <label class="field"><span>Your name</span><input id="set-name" placeholder="Shown instead of “Me”" maxlength="40"></label>
+        <label class="field"><span>Language people speak in calls</span>
+          <select id="set-spoken"><option value="auto">Detect automatically</option><option value="en">English</option><option value="ur">Urdu</option><option value="hi">Hindi</option></select>
+          <small>Choose Urdu or Hindi if most of your calls are in that language and detection gets it wrong. Mixed English-Urdu calls usually work best with automatic detection.</small></label>
+        <label class="field"><span>Write minutes in</span>
+          <select id="set-minutes"><option>English</option><option>Roman Urdu</option></select></label>
+        <label class="check set-check"><input type="checkbox" class="cb" id="set-captions"><span><b>Use Teams live captions for speaker names.</b> During a call Notarius turns on captions in your Teams window (only you see them) and reads who is speaking and whether you're muted. Only who spoke and when is used, not the caption text.</span></label>
+      </section>
+      <section class="set-col" aria-labelledby="set-h-security">
+        <h3 id="set-h-security">Security &amp; privacy</h3>
+        <div class="set-group">
+          <b>Change PIN</b>
+          <div class="set-pair">
+            <label class="field"><span>Current PIN</span><input type="password" id="set-old" inputmode="numeric" maxlength="4" autocomplete="off"></label>
+            <label class="field"><span>New PIN</span><input type="password" id="set-new" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="4 digits"></label>
+          </div>
+        </div>
+        <div class="set-group">
+          <b>Recovery key</b>
+          <p>Resets a forgotten PIN. Creating a new one makes the old one stop working.</p>
+          <button class="btn" type="button" id="new-rk">Create a new recovery key</button>
+        </div>
+        <div class="set-group">
+          <b>Remembered voices</b>
+          <p id="voices-list">None yet. Name people in a meeting's People tab and their voices are remembered.</p>
+          <button class="btn" type="button" id="forget-voices">Forget remembered voices</button>
+        </div>
+      </section>
+    </div>
+    <footer class="set-foot">
+      <span id="set-version"></span>
+      <div class="err" id="set-err" role="alert"></div>
+      <button class="btn" type="button" id="settings-cancel">Cancel</button><button class="btn primary" type="submit">Save</button>
+    </footer>
   </form>
 </div>
 
-<div class="layout" id="layout">
-  <aside class="card side" aria-label="Calendar">
-    <div class="cal-head">
-      <button class="icon-btn" id="prev" aria-label="Previous month">&#8249;</button>
-      <div class="month" id="month"></div>
-      <button class="icon-btn" id="next" aria-label="Next month">&#8250;</button>
+<div class="overlay modal pal-wrap" id="palette" hidden>
+  <div class="pal" role="dialog" aria-label="Search">
+    <div class="pal-in">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Search meetings, minutes, transcripts and notes" autocomplete="off" aria-label="Search" aria-controls="pal-res">
+      <kbd>Esc</kbd>
     </div>
-    <div class="grid" id="grid"></div>
-    <div class="ranges" id="ranges">
-      <button class="chip" data-range="today">Today</button>
-      <button class="chip" data-range="yesterday">Yesterday</button>
-      <button class="chip" data-range="week">This week</button>
-      <button class="chip" data-range="last7">Last 7 days</button>
-      <button class="chip" data-range="month">This month</button>
-      <button class="chip" data-range="all">All</button>
-    </div>
-    <div class="hint">Click a day, or drag across days to pick a range.</div>
-    <div class="side-foot" id="side-foot"></div>
-  </aside>
-  <main id="main"></main>
+    <div class="pal-res" id="pal-res" role="listbox"></div>
+    <div class="pal-foot"><span><kbd>↑</kbd> <kbd>↓</kbd> to move</span><span><kbd>Enter</kbd> to open</span></div>
+  </div>
 </div>
+
 <div class="toast" id="toast" role="status"></div>
-<div id="tour" hidden><div class="tour-spot" id="tour-spot"></div><div class="tour-card" id="tour-card" role="dialog" aria-live="polite"></div></div>
+<div id="tour" hidden><div class="tour-scrim" id="tour-scrim"></div><div class="tour-spot" id="tour-spot"></div><div class="tour-card" id="tour-card" role="dialog" aria-live="polite"></div></div>
 
 <script>
 // ===================================================================== helpers
 const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const pad = (n) => String(n).padStart(2, "0");
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const parseYmd = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
@@ -421,12 +669,12 @@ function currentTheme() { return savedTheme() || (matchMedia("(prefers-color-sch
 function applyTheme() { document.documentElement.dataset.theme = location.pathname === "/print" ? "light" : currentTheme(); }
 applyTheme();
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
-document.getElementById("theme").onclick = () => {
+$("#theme").onclick = () => {
   const next = currentTheme() === "dark" ? "light" : "dark";
   try { localStorage.setItem("notarius.theme", next); } catch (e) {}
   applyTheme();
 };
-let SESSION = null;  // lives only in this page: a reload or a new tab asks for the PIN again
+let SESSION = null;  // lives only in this page: a reload, a new tab or a new window asks for the PIN again
 async function api(path, opts = {}) {
   const headers = { "X-Notetaker": "1", ...(PRINT_TOKEN ? { "X-Print-Token": PRINT_TOKEN } : {}),
                     ...(SESSION ? { "X-Session": SESSION } : {}), ...(opts.headers || {}) };
@@ -441,15 +689,47 @@ const fmtDay = (s, opts = { weekday: "long", day: "numeric", month: "long", year
 const fmtShort = (s) => fmtDay(s, { weekday: "short", day: "numeric", month: "short" });
 const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 const fmtMins = (sec) => sec >= 60 ? `${Math.round(sec / 60)} min` : `${sec}s`;
-const COLORS = ["#0e7490", "#c2410c", "#be185d", "#15803d", "#7c3aed", "#a16207", "#1d4ed8", "#9f1239"];
+function relDay(s) {
+  const today = ymd(new Date()), y = new Date(); y.setDate(y.getDate() - 1);
+  if (s === today) return "Today";
+  if (s === ymd(y)) return "Yesterday";
+  return fmtDay(s, { weekday: "long" });
+}
+const myName = () => (S.status && S.status.my_name && S.status.my_name !== "Me" ? S.status.my_name : "");
+const COLORS = ["#0e7490", "#c2410c", "#be185d", "#15803d", "#7c3aed", "#a16207", "#1d4ed8", "#9f1239", "#0f766e", "#b45309"];
 function colorFor(id) { if (id === "ME") return "#4f46e5"; const n = parseInt(String(id).replace(/\D/g, "")) || 0; return COLORS[n % COLORS.length]; }
+function colorForName(name) { let h = 0; for (const c of String(name)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return COLORS[h % COLORS.length]; }
+function initials(name) {
+  const s = String(name || "?").trim(); const sp = s.match(/^Speaker\s+(\d+)/i); if (sp) return "S" + sp[1];
+  const w = s.split(/\s+/).filter(Boolean); return ((w[0] || "?")[0] + (w.length > 1 ? w[w.length - 1][0] : "")).toUpperCase();
+}
+function avatar(name, color, cls = "") { return `<span class="av ${cls}" style="--c:${color || colorForName(name)}" title="${esc(name)}">${esc(initials(name))}</span>`; }
+function avatarStack(names, max = 4) {
+  if (!names.length) return "";
+  return `<span class="av-stack">${names.slice(0, max).map((n) => avatar(n)).join("")}</span>${names.length > max ? `<span class="av-more">+${names.length - max}</span>` : ""}`;
+}
 let toastTimer;
-function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2600); }
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2800); }
+const sv = (body, w = 1.8) => `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 const ICON = {
-  word: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 2h7l4 4v12H5z"/><path d="M8 10l1 5 1.5-3.5L12 15l1-5"/></svg>',
-  pdf: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 2h7l4 4v12H5z"/><path d="M8 11h4M8 14h4"/></svg>',
-  copy: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="7" y="7" width="10" height="11" rx="2"/><path d="M13 7V4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>',
-  folder: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 5a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/></svg>',
+  word: sv('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m8.5 12 1.2 5 1.8-3.5 1.8 3.5 1.2-5"/>'),
+  pdf: sv('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>'),
+  copy: sv('<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>'),
+  download: sv('<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>'),
+  chevDown: sv('<path d="m6 9 6 6 6-6"/>', 2),
+  chevLeft: sv('<path d="m15 18-6-6 6-6"/>', 2),
+  cal: sv('<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>'),
+  clock: sv('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+  users: sv('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"/>'),
+  doc: sv('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>'),
+  mic: sv('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>'),
+  check: sv('<rect x="3" y="3" width="18" height="18" rx="4"/><path d="m8 12 3 3 5-6"/>'),
+  note: sv('<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>'),
+  search: sv('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>', 2),
+  x: sv('<path d="M6 6l12 12M18 6 6 18"/>', 2.2),
+  spark: sv('<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>'),
+  pause: '<svg viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3" height="11" rx="1"/><rect x="9.5" y="2.5" width="3" height="11" rx="1"/></svg>',
+  play: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 2.8v10.4a.8.8 0 0 0 1.2.7l8.3-5.2a.8.8 0 0 0 0-1.4L5.7 2.1a.8.8 0 0 0-1.2.7z"/></svg>',
 };
 
 // ===================================================================== markdown (escape first, then add markup)
@@ -469,14 +749,18 @@ function md(src) {
       const rows = [];
       while (i < lines.length && /^\s*\|/.test(lines[i])) rows.push(lines[i++]);
       const cells = (r) => r.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
-      html += "<table>" + rows.filter((r) => !/^\s*\|?\s*:?-{3,}/.test(r)).map((r, k) =>
-        "<tr>" + cells(r).map((c) => k === 0 ? `<th>${inline(esc(c))}</th>` : `<td>${inline(esc(c))}</td>`).join("") + "</tr>").join("") + "</table>";
+      const body = rows.filter((r) => !/^\s*\|?\s*:?-{3,}/.test(r)).map((r, k) =>
+        "<tr>" + cells(r).map((c) => k === 0 ? `<th>${inline(esc(c))}</th>` : `<td>${inline(esc(c))}</td>`).join("") + "</tr>");
+      html += `<table><thead>${body[0] || ""}</thead><tbody>${body.slice(1).join("")}</tbody></table>`;  // thead repeats on each printed page
       continue;
     }
     if (/^\s*([-*]|\d+\.)\s+/.test(l)) {
       const tag = /^\s*\d+\.\s/.test(l) ? "ol" : "ul";
       html += `<${tag}>`;
-      while (i < lines.length && /^\s*([-*]|\d+\.)\s+/.test(lines[i])) html += `<li>${inline(esc(lines[i++].replace(/^\s*([-*]|\d+\.)\s+/, "")))}</li>`;
+      while (i < lines.length && /^\s*([-*]|\d+\.)\s+/.test(lines[i])) {
+        const item = inline(esc(lines[i++].replace(/^\s*([-*]|\d+\.)\s+/, "")));
+        html += item.startsWith("<strong>Decision:</strong>") ? `<li class="decision">${item}</li>` : `<li>${item}</li>`;
+      }
       html += `</${tag}>`;
       continue;
     }
@@ -486,41 +770,70 @@ function md(src) {
   }
   return html;
 }
-// Minutes body without the title line and the action-items table (both shown separately).
-function minutesBody(notes) {
-  return notes.replace(/^# .*\n?/m, "").replace(/^\*\*Summary:\*\*.*\n?/m, "").replace(/\n## Action Items[\s\S]*?(?=\n## |\s*$)/, "\n");
+// Minutes body without the title line, the summary and the action-items table (all shown separately).
+// The app also drops the Date/Time/Attendees line and the "Minutes" heading, which the page header shows;
+// the PDF keeps the attendees line.
+function minutesBody(notes, forApp = false) {
+  let body = notes.replace(/^# .*\n?/m, "").replace(/^\*\*Summary:\*\*.*\n?/m, "").replace(/\n## Action Items[\s\S]*?(?=\n## |\s*$)/, "\n");
+  if (forApp) body = body.replace(/^\*\*Date:\*\*.*\n?/m, "").replace(/^## Minutes\s*\n/m, "");
+  return body;
 }
 
 // ===================================================================== state
 const S = {
-  meetings: [], status: null, view: new Date(), sel: new Set([ymd(new Date())]), range: "today",
-  meetingId: null, meeting: null, tab: "minutes", showDone: false, query: "", results: null,
+  meetings: [], status: null, view: new Date(), sel: null, range: "all", page: "meetings",
+  meetingId: null, meeting: null, tab: "minutes", showDone: false, mineOnly: false, trq: "",
 };
 S.view.setDate(1);
 
-function selectionDays() { return [...S.sel].sort(); }
+// Minutes you haven't opened yet get a "new" dot. Kept per viewer in this browser profile only.
+function loadSeen() { try { const v = JSON.parse(localStorage.getItem("notarius.seen") || "null"); return Array.isArray(v) ? new Set(v) : null; } catch (e) { return null; } }
+function saveSeen() { try { localStorage.setItem("notarius.seen", JSON.stringify([...S.seen].slice(-1000))); } catch (e) {} }
+function isNew(m) { return !!S.seen && m.status === "ready" && !S.seen.has(m.id); }
+function markSeen(id) { if (S.seen && !S.seen.has(id)) { S.seen.add(id); saveSeen(); } }
+
+function selectionDays() { return S.sel ? [...S.sel].sort() : []; }
 function rangeSet(a, b) {
   let [x, y] = [parseYmd(a), parseYmd(b)]; if (x > y) [x, y] = [y, x];
   const out = new Set(); for (const d = new Date(x); d <= y; d.setDate(d.getDate() + 1)) out.add(ymd(d)); return out;
 }
-function meetingsInSelection() { return S.meetings.filter((m) => S.sel.has(m.date)).sort((a, b) => a.id.localeCompare(b.id)); }
+function filteredMeetings() { return S.meetings.filter((m) => !S.sel || S.sel.has(m.date)).sort((a, b) => b.id.localeCompare(a.id)); }
+function selectionTitle() {
+  const days = selectionDays();
+  if (!days.length) return "All meetings";
+  if (days.length === 1) return fmtDay(days[0], { weekday: "long", day: "numeric", month: "long" });
+  const contiguous = rangeSet(days[0], days[days.length - 1]).size === days.length;
+  if (contiguous) return `${fmtDay(days[0], { day: "numeric", month: "short" })} – ${fmtDay(days[days.length - 1], { day: "numeric", month: "short" })}`;
+  return plural(days.length, "selected day");
+}
 
-// ===================================================================== status bar
+// ===================================================================== sidebar: status, counts, me
 function renderStatus() {
-  const el = $("#state"), st = S.status;
-  el.className = "state";
-  if (!st) { el.classList.add("off"); $("#state-text").textContent = "Not connected"; return; }
-  const pb = $("#pause");
-  pb.classList.toggle("paused", !!st.paused);
-  pb.querySelector("span").textContent = st.paused ? "Resume" : "Pause";
-  if (st.paused) { el.classList.add("paused"); $("#state-text").textContent = "Paused: not taking notes"; return; }
+  const el = $("#status-card"), st = S.status, title = $("#state-text"), sub = $("#state-sub"), pb = $("#pause");
+  el.className = "status";
+  if (!st) { el.classList.add("off"); title.textContent = "Not connected"; sub.textContent = "Is Notarius running?"; pb.hidden = true; return; }
+  pb.hidden = false;
+  pb.innerHTML = (st.paused ? ICON.play : ICON.pause) + `<span>${st.paused ? "Resume" : "Pause"}</span>`;
+  if (st.paused) { el.classList.add("paused"); title.textContent = "Paused"; sub.textContent = "Calls aren't being recorded"; return; }
   if (st.recording) {
     el.classList.add("rec");
     const secs = Math.max(0, Math.round((Date.now() - new Date(st.since).getTime()) / 1000));
-    $("#state-text").textContent = `Recording Teams call · ${Math.floor(secs / 60)}:${pad(secs % 60)}`;
-  } else if (st.processing) { el.classList.add("busy"); $("#state-text").textContent = "Writing minutes..."; }
-  else if (st.watching) { $("#state-text").textContent = "Watching for Teams calls"; }
-  else { el.classList.add("off"); $("#state-text").textContent = "Not recording calls (open Notarius from the Start menu)"; }
+    const h = Math.floor(secs / 3600), m = Math.floor(secs / 60) % 60;
+    title.textContent = `Recording · ${h ? h + ":" + pad(m) : m}:${pad(secs % 60)}`;
+    sub.textContent = "Teams call in progress";
+  } else if (st.processing) { el.classList.add("busy"); title.textContent = "Writing minutes"; sub.textContent = "Ready in a minute or two"; }
+  else if (st.watching) { title.textContent = "Listening for Teams"; sub.textContent = "Recording starts when you join"; }
+  else { el.classList.add("off"); title.textContent = "Not recording calls"; sub.textContent = "Open Notarius from the Start menu"; pb.hidden = true; }
+}
+function renderSidebar() {
+  const open = S.meetings.reduce((n, m) => n + m.actions.filter((a) => !a.done).length, 0);
+  const fresh = S.meetings.filter(isNew).length, cm = $("#count-meetings");
+  cm.textContent = fresh ? `${fresh} new` : S.meetings.length || ""; cm.classList.toggle("hot", fresh > 0);
+  const ca = $("#count-actions"); ca.textContent = open || ""; ca.classList.toggle("hot", open > 0);
+  const name = myName() || "You";
+  const me = $("#me-avatar"); me.textContent = initials(name); me.style.setProperty("--c", "#4f46e5"); me.title = name;
+  $("#me-name").textContent = name;
+  $$(".nav-item").forEach((b) => b.classList.toggle("on", !S.meetingId && b.dataset.page === S.page));
 }
 
 // ===================================================================== calendar
@@ -529,40 +842,41 @@ function renderCalendar() {
   $("#month").textContent = S.view.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const counts = {}; for (const m of S.meetings) counts[m.date] = (counts[m.date] || 0) + 1;
   const start = new Date(S.view); start.setDate(1 - ((S.view.getDay() + 6) % 7));
-  const today = ymd(new Date()), days = selectionDays();
+  const today = ymd(new Date()), days = selectionDays(), sel = S.sel || new Set();
   const contiguous = days.length > 1 && rangeSet(days[0], days[days.length - 1]).size === days.length;
-  let html = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((d) => `<div class="dow">${d}</div>`).join("");
+  let html = ["M", "T", "W", "T", "F", "S", "S"].map((d) => `<div class="dow">${d}</div>`).join("");
   for (let k = 0; k < 42; k++) {
     const d = new Date(start); d.setDate(start.getDate() + k);
-    const key = ymd(d), n = counts[key] || 0, sel = S.sel.has(key);
+    const key = ymd(d), n = counts[key] || 0, on = sel.has(key);
     const cls = ["day"];
     if (d.getMonth() !== S.view.getMonth()) cls.push("out");
     if (key === today) cls.push("today");
-    if (sel && S.sel.size === 1) cls.push("single");
-    else if (sel) {
+    if (n) cls.push("has");
+    if (on && sel.size === 1) cls.push("single");
+    else if (on) {
       cls.push("in-range");
       const prev = new Date(d); prev.setDate(d.getDate() - 1); const next = new Date(d); next.setDate(d.getDate() + 1);
-      if (!S.sel.has(ymd(prev)) || d.getDay() === 1) cls.push("first");
-      if (!S.sel.has(ymd(next)) || d.getDay() === 0) cls.push("last");
+      if (!sel.has(ymd(prev)) || d.getDay() === 1) cls.push("first");
+      if (!sel.has(ymd(next)) || d.getDay() === 0) cls.push("last");
       if (contiguous && (key === days[0] || key === days[days.length - 1])) cls.push("edge");
     }
-    html += `<button class="${cls.join(" ")}" data-day="${key}" aria-pressed="${sel}" aria-label="${fmtDay(key)}${n ? ", " + plural(n, "meeting") : ""}">` +
-            `<span class="num">${d.getDate()}</span>${n ? `<span class="count">${n}</span>` : ""}</button>`;
+    html += `<button type="button" class="${cls.join(" ")}" data-day="${key}" aria-pressed="${on}" aria-label="${fmtDay(key)}${n ? ", " + plural(n, "meeting") : ""}">` +
+            `<span class="num">${d.getDate()}</span></button>`;
   }
   $("#grid").innerHTML = html;
-  document.querySelectorAll("#ranges .chip").forEach((c) => c.classList.toggle("on", c.dataset.range === S.range));
-  const total = S.meetings.length;
-  $("#side-foot").textContent = total ? `${plural(total, "meeting")} recorded in total.` : "No meetings recorded yet.";
+  $("#cal-foot").innerHTML = S.sel ? `<span>${esc(selectionTitle())}</span><button type="button" class="linkbtn" id="cal-clear">Show all</button>` : "<span>Drag across days to pick a range</span>";
+  const clr = $("#cal-clear"); if (clr) clr.onclick = () => selectDays(null, "all");
 }
 function selectDays(set, range = null) {
-  S.sel = set; S.range = range; S.meetingId = null; S.meeting = null; S.query = ""; $("#q").value = "";
+  S.sel = set && set.size ? set : null; S.range = S.sel ? range : "all"; S.meetingId = null; S.meeting = null;
+  if (S.page !== "actions") S.page = "meetings";
   history.replaceState(null, "", location.pathname);
-  renderCalendar(); renderMain();
+  renderCalendar(); renderMain(); $("#main").scrollTop = 0;
 }
 $("#grid").addEventListener("mousedown", (e) => {
   const b = e.target.closest("[data-day]"); if (!b || e.button !== 0) return;
-  if (e.ctrlKey || e.metaKey) { const s = new Set(S.sel); s.has(b.dataset.day) ? s.delete(b.dataset.day) : s.add(b.dataset.day); if (s.size) selectDays(s); return; }
-  if (e.shiftKey && S.sel.size) { selectDays(rangeSet(selectionDays()[0], b.dataset.day)); return; }
+  if (e.ctrlKey || e.metaKey) { const s = new Set(S.sel || []); s.has(b.dataset.day) ? s.delete(b.dataset.day) : s.add(b.dataset.day); selectDays(s); return; }
+  if (e.shiftKey && S.sel) { selectDays(rangeSet(selectionDays()[0], b.dataset.day)); return; }
   dragFrom = b.dataset.day; dragged = false; e.preventDefault();
 });
 $("#grid").addEventListener("mouseover", (e) => {
@@ -583,98 +897,119 @@ $("#grid").addEventListener("keydown", (e) => {
 });
 $("#prev").onclick = () => { S.view.setMonth(S.view.getMonth() - 1); renderCalendar(); };
 $("#next").onclick = () => { S.view.setMonth(S.view.getMonth() + 1); renderCalendar(); };
-document.querySelectorAll("#ranges .chip").forEach((c) => c.onclick = () => {
-  const now = new Date(), t = ymd(now), r = c.dataset.range;
+function quickRange(r) {
+  const now = new Date(), t = ymd(now);
   const back = (n) => { const d = new Date(now); d.setDate(d.getDate() - n); return ymd(d); };
-  let set;
-  if (r === "today") set = new Set([t]);
-  if (r === "yesterday") set = new Set([back(1)]);
-  if (r === "week") { const mon = back((now.getDay() + 6) % 7); const sun = new Date(parseYmd(mon)); sun.setDate(sun.getDate() + 6); set = rangeSet(mon, ymd(sun)); }
-  if (r === "last7") set = rangeSet(back(6), t);
-  if (r === "month") set = rangeSet(ymd(new Date(now.getFullYear(), now.getMonth(), 1)), ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0)));
-  if (r === "all") set = S.meetings.length ? rangeSet(S.meetings[0].date, S.meetings[S.meetings.length - 1].date) : new Set([t]);
   S.view = new Date(now.getFullYear(), now.getMonth(), 1);
-  selectDays(set, r);
-});
+  if (r === "all") return selectDays(null, "all");
+  if (r === "today") return selectDays(new Set([t]), r);
+  if (r === "week") { const mon = back((now.getDay() + 6) % 7); const sun = parseYmd(mon); sun.setDate(sun.getDate() + 6); return selectDays(rangeSet(mon, ymd(sun)), r); }
+  if (r === "month") return selectDays(rangeSet(ymd(new Date(now.getFullYear(), now.getMonth(), 1)), ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0))), r);
+}
+$$(".nav-item").forEach((b) => b.onclick = () => { S.page = b.dataset.page; S.meetingId = null; S.meeting = null; history.replaceState(null, "", location.pathname); renderMain(); $("#main").scrollTop = 0; });
 
 // ===================================================================== main view router
 function renderMain() {
-  if (S.query) return renderSearch();
+  renderSidebar();
   if (S.meetingId) return renderMeeting();
-  return renderOverview();
+  if (S.page === "actions") return renderActions();
+  return renderMeetings();
 }
-function exportButtons(ids) {
+function exportMenu(ids, label = "Export") {
   const dis = ids.length ? "" : "disabled";
-  return `<button class="btn" data-export="docx" data-ids="${ids.join(",")}" ${dis}>${ICON.word} Word</button>` +
-         `<button class="btn" data-export="pdf" data-ids="${ids.join(",")}" ${dis}>${ICON.pdf} PDF</button>`;
+  return `<div class="menu-wrap"><button type="button" class="btn" data-menu ${dis} title="${ids.length ? "" : "No minutes to export yet"}">${ICON.download}${label}${ICON.chevDown}</button>
+    <div class="menu" hidden>
+      ${ids.length > 1 ? `<div class="menu-note">${plural(ids.length, "meeting")} in one document</div>` : ""}
+      <button type="button" data-export="docx" data-ids="${ids.join(",")}">${ICON.word}Word document</button>
+      <button type="button" data-export="pdf" data-ids="${ids.join(",")}">${ICON.pdf}PDF</button></div></div>`;
 }
-function selectionTitle() {
-  const days = selectionDays();
-  if (days.length === 1) return fmtDay(days[0]);
-  const contiguous = rangeSet(days[0], days[days.length - 1]).size === days.length;
-  if (contiguous) return `${fmtDay(days[0], { day: "numeric", month: "short" })} – ${fmtDay(days[days.length - 1], { day: "numeric", month: "short", year: "numeric" })}`;
-  return plural(days.length, "selected day");
+function rangeTabs() {
+  const opts = [["all", "All"], ["today", "Today"], ["week", "This week"], ["month", "This month"]];
+  return `<div class="seg" role="group" aria-label="Show meetings from">${opts.map(([k, l]) => `<button type="button" data-range="${k}" class="${S.range === k ? "on" : ""}">${l}</button>`).join("")}</div>`;
+}
+function filterChip() {
+  if (!S.sel || ["today", "week", "month"].includes(S.range)) return "";
+  return `<span class="filter-chip">${ICON.cal}${esc(selectionTitle())}<button type="button" data-range="all" aria-label="Show all meetings">${ICON.x}</button></span>`;
 }
 
-// ---------- overview of the selected days
+// ---------- action item row
 function actionRow(m, a, showFrom) {
-  const mine = S.status && a.owner === S.status.my_name;
+  const mine = myName() && a.owner === myName();
+  const owner = a.owner && a.owner !== "Unassigned" ? `<span class="owner">${avatar(a.owner, mine ? "#4f46e5" : null)}<span class="${mine ? "me" : ""}">${esc(mine ? "You" : a.owner)}</span></span>` : `<span>Unassigned</span>`;
+  const due = a.due && a.due !== "-" ? `<span class="due">${ICON.cal}${esc(a.due)}</span>` : "";
   return `<div class="act ${a.done ? "done" : ""}">
-    <input type="checkbox" ${a.done ? "checked" : ""} data-act="${m.id}:${a.i}" aria-label="Mark done: ${esc(a.action)}">
-    <div><div class="what">${inline(esc(a.action))}</div>
-      <div class="who"><span class="${mine ? "owner-me" : ""}">${esc(a.owner || "Unassigned")}</span>${a.due && a.due !== "-" ? " · due " + esc(a.due) : ""}</div></div>
-    ${showFrom ? `<button class="from" data-open="${m.id}">${esc(m.title || "Teams meeting")}</button>` : "<span></span>"}
+    <input type="checkbox" class="cb" ${a.done ? "checked" : ""} data-act="${m.id}:${a.i}" aria-label="Mark done: ${esc(a.action)}">
+    <div><div class="what">${inline(esc(a.action))}</div><div class="who">${owner}${due ? "<span>·</span>" + due : ""}</div></div>
+    ${showFrom ? `<button type="button" class="from" data-open="${m.id}" data-tab="actions" title="${esc(m.title || "Teams meeting")}">${esc(m.title || "Teams meeting")}</button>` : "<span></span>"}
   </div>`;
 }
-function renderOverview() {
-  const ms = meetingsInSelection(), days = selectionDays();
+function statusBadge(m) {
+  if (m.status === "recording") return '<span class="badge rec">Recording</span>';
+  if (m.status === "processing") return '<span class="badge busy"><span class="spin"></span>Writing minutes</span>';
+  if (m.status === "failed") return '<span class="badge bad">Failed</span>';
+  return "";
+}
+
+// ---------- meetings feed
+function renderMeetings() {
+  const ms = filteredMeetings();
   const ready = ms.filter((m) => m.status === "ready").map((m) => m.id);
-  const acts = ms.flatMap((m) => m.actions.map((a) => [m, a]));
-  const open = acts.filter(([, a]) => !a.done);
-  const shown = S.showDone ? acts : open;
-  let html = `<div class="page-head"><div><h1>${esc(selectionTitle())}</h1>
-      <div class="sub">${plural(ms.length, "meeting")}${acts.length ? ` · ${open.length} open of ${plural(acts.length, "action item")}` : ""}</div></div>
-    <div class="tools">${exportButtons(ready)}</div></div>`;
-
-  html += `<div class="section"><h2>Meetings <span class="n">${ms.length}</span></h2>`;
-  if (!ms.length) {
-    html += `<div class="card empty"><b>No meetings ${days.length === 1 ? "on this day" : "in these days"}</b>
-      Minutes are taken automatically when you join a Teams call while Notarius is running.</div>`;
+  let html = `<div class="page"><header class="ph"><div><h1>Meetings</h1>
+      <div class="ph-sub">${S.sel ? esc(selectionTitle()) + " · " : ""}${plural(ms.length, "meeting")}</div></div>
+    <div class="ph-tools">${filterChip()}${rangeTabs()}${exportMenu(ready)}</div></header>`;
+  if (!S.meetings.length) {
+    html += `<div class="card empty"><div class="ill">${ICON.mic}</div><b>Your meetings will show up here</b>
+      <p>Keep Notarius running. When you join a Teams call it records on its own, and the minutes appear here a minute or two after you leave.</p>
+      <div class="steps"><div><b>1. Join a Teams call</b><br>Muted or not, no bot joins.</div><div><b>2. Talk as usual</b><br>The tray icon turns red while recording.</div><div><b>3. Read the minutes</b><br>Summary, decisions and action items.</div></div></div></div>`;
+    $("#main").innerHTML = html; return;
   }
-  for (const m of ms) {
-    const done = m.actions.filter((a) => a.done).length;
-    const pill = m.status === "recording" ? '<span class="pill recording">Recording now</span>'
-      : m.status === "processing" ? '<span class="pill processing">Writing minutes...</span>'
-      : m.status === "failed" ? '<span class="pill failed">Failed</span>'
-      : m.actions.length ? `<span class="pill ${done === m.actions.length ? "done" : "plain"}">${done}/${m.actions.length} actions done</span>` : "";
-    html += `<button class="mtg" data-open="${m.id}">
-      <div><div class="time">${m.start}</div><div class="dur">${m.duration_min ? m.duration_min + " min" : ""}</div></div>
-      <div style="min-width:0"><div class="title">${esc(m.title || (m.status === "ready" ? "Teams meeting" : "Teams call"))}</div>
-        <div class="meta">${days.length > 1 ? `<span>${fmtShort(m.date)}</span>` : ""}${m.people.length ? `<span>With ${esc(m.people.join(", "))}</span>` : ""}${m.unnamed_speakers ? `<span>${plural(m.unnamed_speakers, "unnamed speaker")}</span>` : ""}${m.has_my_notes ? "<span>Has your notes</span>" : ""}</div>
-        ${m.summary ? `<div class="summary">${inline(esc(m.summary))}</div>` : ""}
-        ${m.topics.length ? `<div class="topics">Topics: ${esc(m.topics.slice(0, 5).join(" · "))}</div>` : ""}
-        ${m.status === "ready" ? `<span class="read">Read minutes and transcript &rarr;</span>` : ""}</div>
-      <div class="right">${pill}</div></button>`;
+  html += `<div class="home"><div>`;
+  if (!ms.length) html += `<div class="card empty"><div class="ill">${ICON.cal}</div><b>No meetings ${selectionDays().length === 1 ? "on this day" : "in this range"}</b><p>Pick another day in the calendar, or <button type="button" class="linkbtn" data-range="all">show all meetings</button>.</p></div>`;
+  const groups = [];
+  for (const m of ms) { const g = groups[groups.length - 1]; if (g && g.date === m.date) g.items.push(m); else groups.push({ date: m.date, items: [m] }); }
+  for (const g of groups) {
+    const rel = relDay(g.date), full = fmtDay(g.date, { day: "numeric", month: "long", year: parseYmd(g.date).getFullYear() === new Date().getFullYear() ? undefined : "numeric" });
+    html += `<section class="day-group"><h2 class="dg-h">${esc(rel)}<span>${esc(rel === "Today" || rel === "Yesterday" ? fmtDay(g.date, { weekday: "long", day: "numeric", month: "long" }) : full)}</span></h2><div class="mlist">`;
+    for (const m of g.items) html += meetingRow(m);
+    html += `</div></section>`;
   }
-  html += `</div>`;
-
-  if (acts.length) {
-    html += `<div class="section"><h2>${S.showDone ? "All action items" : "Open action items"} <span class="n">${shown.length}</span></h2>
-      <div class="card actions">${shown.length ? shown.map(([m, a]) => actionRow(m, a, true)).join("") : '<div class="empty" style="padding:20px">All done.</div>'}
-      <button class="toggle-done" id="toggle-done">${S.showDone ? "Hide completed" : `Show completed (${acts.length - open.length})`}</button></div></div>`;
-  }
-  if (days.length === 1) {
-    html += `<div class="section"><h2>Notes for ${esc(fmtShort(days[0]))}</h2>
-      <label class="sr" for="daynotes">Notes for this day</label>
-      <textarea class="notes" id="daynotes" placeholder="Anything to remember about this day..."></textarea><div class="save-state" id="daynotes-state"></div></div>`;
-  }
+  html += `</div>${homeRail(ms)}</div></div>`;
   $("#main").innerHTML = html;
-  const tog = $("#toggle-done"); if (tog) tog.onclick = () => { S.showDone = !S.showDone; renderOverview(); };
-  if (days.length === 1) loadDayNotes(days[0]);
+  wireDayNotes();
+}
+function meetingRow(m) {
+  const done = m.actions.filter((a) => a.done).length, total = m.actions.length;
+  const people = m.people || [];
+  const who = people.length ? `<span class="who">${avatarStack(people)}<span>${esc(people.slice(0, 3).join(", "))}${people.length > 3 ? ` and ${people.length - 3} more` : ""}</span></span>`
+    : m.unnamed_speakers ? `<span class="who">${ICON.users}${plural(m.unnamed_speakers, "speaker")}</span>` : "";
+  const extra = [m.unnamed_speakers && people.length ? `${plural(m.unnamed_speakers, "unnamed voice")}` : "", m.has_my_notes ? "Your notes" : ""].filter(Boolean).map((x) => `<span>${x}</span>`).join("");
+  const title = m.title || (m.status === "ready" ? "Teams meeting" : "Teams call");
+  const sum = m.summary ? inline(esc(m.summary)) : m.status === "processing" ? "Transcribing and writing the minutes..." : m.status === "recording" ? "This call is being recorded right now." : m.status === "failed" ? esc(m.error || "Processing failed") : "";
+  const fresh = isNew(m);
+  const topics = (m.topics || []).slice(0, 3).map((t) => `<span class="topic" title="${esc(t)}">${esc(t.replace(/^Topic \d+:\s*/i, ""))}</span>`).join("");
+  return `<button type="button" class="mrow ${fresh ? "unread" : ""}" data-open="${m.id}">
+    <div class="mrow-time"><b>${m.start}</b><span>${m.duration_min ? m.duration_min + " min" : ""}</span></div>
+    <div><div class="mrow-title">${fresh ? '<span class="new-dot" title="New minutes"></span>' : ""}<span class="t">${esc(title)}</span>${statusBadge(m)}</div>
+      ${sum ? `<div class="mrow-sum">${sum}</div>` : ""}
+      ${topics ? `<div class="topics">${topics}</div>` : ""}
+      ${who || extra ? `<div class="mrow-meta">${who}${extra}</div>` : ""}</div>
+    <div class="mrow-side">${total ? `<span class="progress" title="${done} of ${total} action items done"><i style="--p:${Math.round(100 * done / total)}%"></i>${done}/${total}</span>` : ""}</div>
+  </button>`;
+}
+function homeRail(ms) {
+  const open = ms.flatMap((m) => m.actions.filter((a) => !a.done).map((a) => [m, a]));
+  const days = selectionDays(), noteDay = days.length === 1 ? days[0] : !S.sel ? ymd(new Date()) : null;
+  let html = `<aside class="rail"><section class="card"><div class="card-h">Open action items <span class="n">${open.length}</span><button type="button" class="linkbtn" data-page-go="actions">View all</button></div>`;
+  html += open.length ? open.slice(0, 6).map(([m, a]) => actionRow(m, a, false)).join("") : `<div class="empty-mini">Nothing open. Nice.</div>`;
+  html += `</section>`;
+  if (noteDay) html += `<section class="card"><div class="card-h">${noteDay === ymd(new Date()) ? "Today's notes" : "Notes for " + esc(fmtShort(noteDay))}<span class="save-state" id="daynotes-state"></span></div>
+    <label class="sr" for="daynotes">Notes for this day</label><textarea class="notes" id="daynotes" data-day="${noteDay}" placeholder="Anything to remember about this day..."></textarea></section>`;
+  return html + `</aside>`;
 }
 let dayTimer;
-async function loadDayNotes(day) {
+async function wireDayNotes() {
   const ta = $("#daynotes"); if (!ta) return;
+  const day = ta.dataset.day;
   const r = await api(`/api/days/${day}`); if (!r.ok) return;
   if ($("#daynotes") === ta && document.activeElement !== ta) ta.value = (await r.json()).notes;
   ta.oninput = () => {
@@ -682,112 +1017,164 @@ async function loadDayNotes(day) {
     clearTimeout(dayTimer);
     dayTimer = setTimeout(async () => {
       const ok = (await api(`/api/days/${day}`, { method: "PUT", body: ta.value })).ok;
-      const st = $("#daynotes-state"); if (st) st.textContent = ok ? "Saved" : "Couldn't save. Is Notarius running?";
+      const st = $("#daynotes-state"); if (st) st.textContent = ok ? "Saved" : "Couldn't save";
     }, 500);
   };
 }
 
+// ---------- action items page
+function renderActions() {
+  const ms = filteredMeetings(), me = myName();
+  const groups = ms.map((m) => [m, m.actions.filter((a) => (S.showDone || !a.done) && (!S.mineOnly || (me && a.owner === me)))]).filter(([, as]) => as.length);
+  const all = ms.flatMap((m) => m.actions), open = all.filter((a) => !a.done).length;
+  let html = `<div class="page narrow"><header class="ph"><div><h1>Action items</h1>
+      <div class="ph-sub">${S.sel ? esc(selectionTitle()) + " · " : ""}${open} open of ${plural(all.length, "item")}</div></div>
+    <div class="ph-tools">${filterChip()}
+      <div class="seg" role="group" aria-label="Whose items">${me ? `<button type="button" data-mine="0" class="${S.mineOnly ? "" : "on"}">Everyone</button><button type="button" data-mine="1" class="${S.mineOnly ? "on" : ""}">Mine</button>` : ""}</div>
+      <div class="seg" role="group" aria-label="Which items"><button type="button" data-done="0" class="${S.showDone ? "" : "on"}">Open</button><button type="button" data-done="1" class="${S.showDone ? "on" : ""}">All</button></div>
+    </div></header>`;
+  if (!groups.length) html += `<div class="card empty"><div class="ill">${ICON.check}</div><b>${all.length ? "All caught up" : "No action items yet"}</b><p>${all.length ? "Every action item here is done." : "Action items from your meetings' minutes appear here, with owners and due dates."}</p></div>`;
+  for (const [m, as] of groups) {
+    html += `<section class="ag"><div class="ag-h"><button type="button" data-open="${m.id}" data-tab="actions">${esc(m.title || "Teams meeting")}</button><span>${esc(fmtShort(m.date))} · ${m.start}</span></div>
+      <div class="card">${as.map((a) => actionRow(m, a, false)).join("")}</div></section>`;
+  }
+  $("#main").innerHTML = html + `</div>`;
+}
+
 // ---------- single meeting
 async function openMeeting(id, tab = "minutes") {
-  S.meetingId = id; S.tab = tab; S.query = ""; $("#q").value = "";
+  S.meetingId = id; S.tab = tab; S.trq = "";
+  closePalette(); markSeen(id);
   history.replaceState(null, "", "#" + id);
-  const m = S.meetings.find((x) => x.id === id);
-  if (m && !S.sel.has(m.date)) { S.sel = new Set([m.date]); S.range = null; S.view = parseYmd(m.date); S.view.setDate(1); renderCalendar(); }
   await loadMeeting();
-  window.scrollTo({ top: 0 });
+  $("#main").scrollTop = 0;
 }
 async function loadMeeting() {
   const r = await api(`/api/meetings/${S.meetingId}`);
   if (!r.ok) { S.meetingId = null; return renderMain(); }
   S.meeting = await r.json();
+  renderSidebar();
   renderMeeting();
 }
+function speakerName(p) { return p.id === "ME" ? (p.name || myName() || "You") : (p.name || p.label); }
 function renderMeeting() {
   const m = S.meeting; if (!m) return;
-  const days = selectionDays();
-  let html = `<button class="back" id="back">&#8249; ${days.length === 1 ? esc(fmtShort(days[0])) : "All selected days"}</button>
-    <div class="page-head"><div><h1>${esc(m.title || "Teams meeting")}</h1>
-      <div class="sub">${esc(fmtDay(m.date))} · ${m.start}${m.end ? "–" + m.end : ""}${m.duration_min ? " · " + m.duration_min + " min" : ""}</div></div>
-      <div class="tools">${m.notes ? `<button class="btn" id="copy">${ICON.copy} Copy minutes</button>` : ""}
-        ${m.notes ? exportButtons([m.id]) : ""}</div></div>`;
-  if (m.status === "failed") html += `<div class="banner bad"><span>${esc(m.error || "Processing failed")}</span><button class="btn" id="retry">Try again</button></div>`;
-  if (m.status === "processing") html += `<div class="banner warn">${m.rewriting ? `Writing the minutes in ${esc(m.rewriting)} from the transcript you already have`
-    : m.transcript ? "Writing the minutes from the transcript" : "Transcribing and writing the minutes"}. This page updates by itself.</div>`;
-  if (m.status === "recording") html += `<div class="banner bad">This call is being recorded right now. Minutes appear a minute or two after you leave.</div>`;
-
   const people = m.speakers || [];
   const nameable = people.filter((p) => p.nameable);
-  const meName = (p) => p.name || (S.status && S.status.my_name !== "Me" && S.status.my_name) || "You";
-  const named = [...new Set(people.filter((p) => p.id === "ME" || p.name).map((p) => (p.id === "ME" ? meName(p) : p.name)))];
+  const named = [...new Set(people.filter((p) => p.id === "ME" || p.name).map(speakerName))];
   const unnamed = people.filter((p) => p.id !== "ME" && !p.name).length;
-  if (people.length) {
-    html += `<div class="people-line">${named.length ? `With ${esc(named.join(", "))}` : "Speakers not named yet"}`
-      + (unnamed && nameable.length ? ` · <button type="button" class="linkbtn" data-tab="people">${plural(unnamed, "unnamed voice")}: name them</button>` : "")
-      + `</div>`;
-  }
-
   const acts = m.actions || [];
-  const tabs = [["minutes", "Minutes"], ["actions", `Action items${acts.length ? ` (${acts.filter((a) => !a.done).length})` : ""}`], ["transcript", "Transcript"],
-                ...(nameable.length ? [["people", `People (${people.length})`]] : []), ["mynotes", "My notes"]];
-  html += `<div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab ${S.tab === k ? "on" : ""}" role="tab" aria-selected="${S.tab === k}" data-tab="${k}">${l}</button>`).join("")}</div>`;
+  const back = S.page === "actions" ? "Action items" : "Meetings";
+  let html = `<div class="page narrow"><div class="crumbs"><button type="button" id="back">${ICON.chevLeft}${back}</button></div>
+    <div class="m-head"><h1>${esc(m.title || "Teams meeting")}</h1>
+      <div class="ph-tools">${m.notes ? `<button type="button" class="btn" id="copy">${ICON.copy}Copy</button>${exportMenu([m.id])}` : ""}</div></div>
+    <div class="m-meta"><span class="mi">${ICON.cal}${esc(fmtDay(m.date, { weekday: "long", day: "numeric", month: "long" }))}</span>
+      <span class="mi">${ICON.clock}${m.start}${m.end ? "–" + m.end : ""}${m.duration_min ? " · " + m.duration_min + " min" : ""}</span>
+      ${named.length ? `<span class="mi">${avatarStack(named, 5)}<span class="people-names">${esc(named.slice(0, 4).join(", "))}${named.length > 4 ? ` +${named.length - 4}` : ""}</span></span>` : ""}
+      ${unnamed && nameable.length ? `<button type="button" class="linkbtn" data-tab="people">${plural(unnamed, "unnamed voice")}: name them</button>` : ""}</div>`;
+  if (m.status === "failed") html += `<div class="banner bad"><span>${esc(m.error || "Processing failed")}</span><button type="button" class="btn sm" id="retry">Try again</button></div>`;
+  if (m.status === "processing") html += `<div class="banner warn"><span class="spin"></span>${m.rewriting ? `Writing the minutes in ${esc(m.rewriting)} from the transcript you already have`
+    : m.transcript ? "Writing the minutes from the transcript" : "Transcribing and writing the minutes"}. This page updates by itself.</div>`;
+  if (m.status === "recording") html += `<div class="banner bad">This call is being recorded right now. The minutes appear a minute or two after you leave.</div>`;
+
+  const tabs = [["minutes", ICON.spark + "Summary", ""], ["transcript", ICON.mic + "Transcript", ""], ["actions", ICON.check + "Action items", acts.length ? acts.filter((a) => !a.done).length || "" : ""],
+                ...(nameable.length ? [["people", ICON.users + "People", people.length]] : []), ["mynotes", ICON.note + "My notes", m.my_notes && m.my_notes.trim() ? "•" : ""]];
+  const langs = (S.settings && S.settings.minutes_languages) || ["English", "Roman Urdu"];
+  const busy = m.status === "processing" || m.status === "recording";
+  const langSeg = S.tab === "minutes" && m.notes ? `<div class="tab-tools"><span>Minutes in</span><div class="seg" role="group" aria-label="Minutes language">${langs.map((l) =>
+      `<button type="button" data-lang="${esc(l)}" class="${m.language === l ? "on" : ""}" ${busy ? "disabled" : ""}>${esc(l)}</button>`).join("")}</div></div>` : "";
+  html += `<div class="tabs" role="tablist">${tabs.map(([k, l, n]) => `<button type="button" class="tab ${S.tab === k ? "on" : ""}" role="tab" aria-selected="${S.tab === k}" data-tab="${k}">${l}${n !== "" ? `<span class="n">${n}</span>` : ""}</button>`).join("")}${langSeg}</div>`;
+
   if (S.tab === "minutes") {
-    const langs = (S.settings && S.settings.minutes_languages) || ["English", "Roman Urdu"];
-    const busy = m.status === "processing" || m.status === "recording";
-    html += m.notes ? `<div class="doc-bar">Minutes language <div class="seg" role="group" aria-label="Minutes language">${langs.map((l) =>
-      `<button type="button" data-lang="${esc(l)}" class="${m.language === l ? "on" : ""}" ${busy ? "disabled" : ""}>${esc(l)}</button>`).join("")}</div></div>
-      <div class="card doc md">${m.summary ? `<div class="lede">${inline(esc(m.summary))}</div>` : ""}${md(minutesBody(m.notes))}</div>`
-      : `<div class="card empty"><b>No minutes yet</b>They're written a minute or two after the call ends.</div>`;
+    html += m.notes ? `<article class="doc md">${m.summary ? `<div class="summary-box"><div class="lbl">${ICON.spark}Summary</div><p>${inline(esc(m.summary))}</p></div>` : ""}${talkTime(people)}${md(minutesBody(m.notes, true))}</article>`
+      : `<div class="card empty"><div class="ill">${ICON.doc}</div><b>No minutes yet</b><p>They're written a minute or two after the call ends.</p></div>`;
   }
-  if (S.tab === "actions") html += acts.length ? `<div class="card actions">${acts.map((a) => actionRow(m, a, false)).join("")}</div>` : `<div class="card empty"><b>No action items</b>Nothing was assigned in this meeting.</div>`;
-  if (S.tab === "transcript") html += m.transcript ? `<div class="card tr">${transcriptHtml(m)}</div>` : `<div class="card empty"><b>No transcript yet</b></div>`;
-  if (S.tab === "mynotes") html += `<label class="sr" for="mynotes">My notes</label><textarea class="notes" id="mynotes" style="min-height:320px" placeholder="Your own notes for this meeting. They're saved automatically and included in exports.">${esc(m.my_notes || "")}</textarea><div class="save-state" id="mynotes-state"></div>`;
+  if (S.tab === "actions") html += acts.length ? `<div class="card">${acts.map((a) => actionRow(m, a, false)).join("")}</div>`
+    : `<div class="card empty"><div class="ill">${ICON.check}</div><b>No action items</b><p>Nothing was assigned in this meeting.</p></div>`;
+  if (S.tab === "transcript") html += m.transcript ? `<div class="tr-bar"><label class="input-icon">${ICON.search}<span class="sr">Search the transcript</span><input class="input" id="trq" placeholder="Search the transcript" value="${esc(S.trq)}"></label><span class="tr-count" id="tr-count"></span></div><div class="tr" id="tr"></div>`
+    : `<div class="card empty"><div class="ill">${ICON.mic}</div><b>No transcript yet</b><p>The transcript appears once the call has been processed.</p></div>`;
+  if (S.tab === "mynotes") html += `<div class="doc"><label class="sr" for="mynotes">My notes</label><textarea class="notes" id="mynotes" style="min-height:380px" placeholder="Your own notes for this meeting. They're saved automatically and included in exports.">${esc(m.my_notes || "")}</textarea><div class="tr-count" style="margin-top:6px" id="mynotes-state"></div></div>`;
   if (S.tab === "people" && nameable.length) {
     const row = (p) => {
       const value = p.name || p.suggested || "";
-      const badge = p.teams ? '<span class="badge voice">From Teams captions</span>' : p.auto ? '<span class="badge voice">Recognized by voice</span>' : p.suggested && !p.name ? '<span class="badge sugg">Suggested from the conversation</span>' : "";
+      const tag = p.teams ? '<span class="tag voice">From Teams captions</span>' : p.auto ? '<span class="tag voice">Recognized by voice</span>' : p.suggested && !p.name ? '<span class="tag sugg">Suggested</span>' : "";
       const ph = p.id === "ME" ? "Your name" : `Name for Speaker ${p.id.slice(1)}`;
-      return `<div class="person"><span class="sw" style="background:${colorFor(p.id)}"></span>
-        ${p.nameable ? `<input data-speaker="${p.id}" value="${esc(value)}" data-orig="${esc(p.name || "")}" placeholder="${esc(ph)}" aria-label="${esc(ph)}">` : `<b>${esc(p.label)}</b>`}
-        <div class="info">${badge}${p.id === "ME" ? "You" : esc(p.label)} · talked ${fmtMins(p.seconds)}${p.sample ? `<q>${esc(p.sample)}</q>` : ""}</div></div>`;
+      return `<div class="person">${avatar(speakerName(p), colorFor(p.id), "lg")}
+        ${p.nameable ? `<input class="input" data-speaker="${p.id}" value="${esc(value)}" data-orig="${esc(p.name || "")}" placeholder="${esc(ph)}" aria-label="${esc(ph)}">` : `<b>${esc(p.label)}</b>`}
+        <div class="info">${tag}${p.id === "ME" ? "You" : esc(p.label)} · talked ${fmtMins(p.seconds)}
+          <div class="meter" style="--c:${colorFor(p.id)}"><span><i style="width:${Math.round(100 * p.seconds / total)}%"></i></span>${Math.round(100 * p.seconds / total)}%</div>
+          ${p.sample ? `<q>${esc(p.sample)}</q>` : ""}</div></div>`;
     };
+    const total = Math.max(1, people.reduce((n, p) => n + p.seconds, 0));
     const main = people.filter((p) => p.id === "ME" || p.name || p.seconds >= 5);
     const tiny = people.filter((p) => !main.includes(p));
-    html += `<div class="card people"><div class="people-head"><b>People in this meeting</b>
-      <span>Name a voice once and it's recognized in future meetings. If one person shows up twice, give both the same name.</span></div>`
-      + main.map(row).join("")
-      + (tiny.length ? `<div id="tiny-people" ${S.showTiny ? "" : "hidden"}>${tiny.map(row).join("")}</div>
-          <button type="button" class="toggle-done" id="toggle-tiny" style="padding-left:0">${S.showTiny ? "Hide" : "Show"} ${plural(tiny.length, "more voice")} with only a few seconds of speech</button>` : "")
-      + `<div class="people-foot"><button class="btn primary" id="save-names" disabled>Save names and update minutes</button></div></div>`;
+    html += `<p class="people-intro">Name a voice once and Notarius recognizes it in future meetings. If one person shows up twice, give both the same name.</p>
+      <div class="card">${main.map(row).join("")}
+      ${tiny.length ? `<div id="tiny-people" ${S.showTiny ? "" : "hidden"}>${tiny.map(row).join("")}</div>` : ""}
+      <div class="people-foot">${tiny.length ? `<button type="button" class="toggle-done" id="toggle-tiny" style="padding:0">${S.showTiny ? "Hide" : "Show"} ${plural(tiny.length, "more voice")} with only a few seconds of speech</button>` : "<span></span>"}
+        <button type="button" class="btn primary" id="save-names" disabled>Save names and update minutes</button></div></div>`;
   }
-  $("#main").innerHTML = html;
+  $("#main").innerHTML = html + `</div>`;
   wireMeeting(m);
 }
-function transcriptHtml(m) {
+function talkTime(people) {
+  const total = people.reduce((n, p) => n + p.seconds, 0);
+  if (people.length < 2 || total < 30) return "";
+  const shown = people.filter((p) => p.seconds / total >= 0.03).slice(0, 7);
+  const rest = total - shown.reduce((n, p) => n + p.seconds, 0);
+  const pct = (s) => Math.round(100 * s / total);
+  return `<div class="talk"><div class="talk-h"><span>Talk time</span><span>${plural(people.length, "speaker")}</span></div>
+    <div class="talk-bar">${shown.map((p) => `<i style="--c:${colorFor(p.id)};flex:${p.seconds}" title="${esc(speakerName(p))}: ${pct(p.seconds)}%"></i>`).join("")}${rest > 0 ? `<i style="--c:var(--line-strong);flex:${rest}" title="Others"></i>` : ""}</div>
+    <div class="talk-legend">${shown.map((p) => `<span style="--c:${colorFor(p.id)}"><b>${esc(speakerName(p))}</b>${pct(p.seconds)}%</span>`).join("")}${rest > 0 ? `<span style="--c:var(--line-strong)"><b>Others</b>${pct(rest)}%</span>` : ""}</div></div>`;
+}
+function transcriptRows(m) {
+  return m.transcript.replace(/\r/g, "").split("\n").map((l) => l.match(/^\[(\d\d:\d\d:\d\d)\] \*\*(.+?):\*\* (.*)$/)).filter(Boolean).map(([, t, who, text]) => ({ t, who, text }));
+}
+function renderTranscript(m) {
+  const box = $("#tr"); if (!box) return;
+  const rows = transcriptRows(m);
+  if (!rows.length) { box.innerHTML = `<div class="doc md">${md(m.transcript)}</div>`; return; }
   const byLabel = {}; for (const p of m.speakers || []) byLabel[p.label] = p.id;
-  const rows = m.transcript.replace(/\r/g, "").split("\n").map((l) => l.match(/^\[(\d\d:\d\d:\d\d)\] \*\*(.+?):\*\* (.*)$/)).filter(Boolean);
-  if (!rows.length) return `<div class="md">${md(m.transcript)}</div>`;
-  return rows.map(([, t, who, text]) => `<div class="tr-line"><div class="tr-time">${t}</div>
-    <div class="tr-who" style="color:${colorFor(byLabel[who] ?? (who === (S.status && S.status.my_name) ? "ME" : who))}">${esc(who)}</div><div class="tr-text">${esc(text)}</div></div>`).join("");
+  const q = S.trq.trim().toLowerCase();
+  const shown = q ? rows.filter((r) => r.text.toLowerCase().includes(q) || r.who.toLowerCase().includes(q)) : rows;
+  const hl = (s) => q ? esc(s).replace(new RegExp(esc(q).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), (x) => `<mark>${x}</mark>`) : esc(s);
+  const turns = [];  // consecutive lines by the same person form one turn (not while searching)
+  for (const r of shown) {
+    const last = turns[turns.length - 1];
+    if (!q && last && last.who === r.who) last.ps.push(r); else turns.push({ who: r.who, t: r.t, ps: [r] });
+  }
+  box.innerHTML = turns.map((g) => {
+    const id = byLabel[g.who] ?? (g.who === myName() ? "ME" : g.who);
+    const color = byLabel[g.who] !== undefined || g.who === myName() ? colorFor(id) : colorForName(g.who);
+    return `<div class="tr-turn">${avatar(g.who, color, "lg")}<div><div class="tr-head"><span class="tr-who">${esc(g.who)}</span><span class="tr-time">${g.t}</span></div>
+      <div class="tr-text">${g.ps.map((p) => `<p title="${p.t}">${hl(p.text)}</p>`).join("")}</div></div></div>`;
+  }).join("") || `<div class="empty"><b>No matches</b><p>Nothing in this transcript mentions “${esc(S.trq)}”.</p></div>`;
+  const c = $("#tr-count"); if (c) c.textContent = q ? `${shown.length} ${shown.length === 1 ? "match" : "matches"}` : plural(rows.length, "line");
 }
 let noteTimer;
 function wireMeeting(m) {
   $("#back").onclick = () => { S.meetingId = null; S.meeting = null; history.replaceState(null, "", location.pathname); renderMain(); };
-  document.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { S.tab = b.dataset.tab; renderMeeting(); });
+  $$("#main [data-tab]:not([data-open])").forEach((b) => b.onclick = () => { S.tab = b.dataset.tab; renderMeeting(); });
   const copy = $("#copy"); if (copy) copy.onclick = async () => { await navigator.clipboard.writeText(m.notes); toast("Minutes copied. Paste them into Teams, Outlook or Word."); };
   const retry = $("#retry"); if (retry) retry.onclick = async () => { await api(`/api/meetings/${m.id}/retry`, { method: "POST" }); toast("Trying again..."); await refreshData(true); };
-  document.querySelectorAll("[data-lang]").forEach((b) => b.onclick = async () => {
+  $$("[data-lang]").forEach((b) => b.onclick = async () => {
     if (b.classList.contains("on")) return;
     const r = await api(`/api/meetings/${m.id}/rewrite`, { method: "POST", body: JSON.stringify({ language: b.dataset.lang }) });
     const j = await r.json().catch(() => ({}));
     if (r.ok) { toast(j.cached ? `Switched to ${b.dataset.lang}.` : `Writing the minutes in ${b.dataset.lang}. This takes a few seconds.`); await refreshData(true); }
     else toast(j.error || "Couldn't rewrite the minutes");
   });
+  if (S.tab === "transcript" && m.transcript) {
+    renderTranscript(m);
+    const q = $("#trq"); let t;
+    q.oninput = () => { clearTimeout(t); t = setTimeout(() => { S.trq = q.value; renderTranscript(m); }, 120); };
+  }
   const tt = $("#toggle-tiny");
   if (tt) tt.onclick = () => {
     S.showTiny = !S.showTiny; $("#tiny-people").hidden = !S.showTiny;
     tt.textContent = tt.textContent.replace(/^(Show|Hide)/, S.showTiny ? "Hide" : "Show");
   };
-  const inputs = [...document.querySelectorAll("[data-speaker]")], save = $("#save-names");
+  const inputs = $$("[data-speaker]"), save = $("#save-names");
   const dirty = () => inputs.some((i) => i.value.trim() !== i.dataset.orig);
   inputs.forEach((i) => { i.oninput = () => { save.disabled = !dirty(); }; i.onkeydown = (e) => { if (e.key === "Enter" && dirty()) save.click(); }; });
   if (save) {
@@ -811,38 +1198,91 @@ function wireMeeting(m) {
   };
 }
 
-// ---------- search across everything
-let searchTimer;
-$("#q").addEventListener("input", () => {
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(async () => {
-    S.query = $("#q").value.trim();
-    if (!S.query) { S.results = null; return renderMain(); }
-    const r = await api(`/api/search?q=${encodeURIComponent(S.query)}`);
-    S.results = r.ok ? await r.json() : [];
-    renderSearch();
-  }, 250);
-});
-function renderSearch() {
-  const q = S.query, res = S.results || [];
-  const hl = (s) => esc(s).replace(new RegExp(esc(q).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), (x) => `<mark>${x}</mark>`);
-  let html = `<div class="page-head"><div><h1>Search</h1><div class="sub">${plural(res.length, "meeting")} mention “${esc(q)}”</div></div></div><div class="results">`;
-  for (const r of res) {
-    const m = S.meetings.find((x) => x.id === r.id) || {};
-    html += `<button class="res" data-open="${r.id}" data-tab="${r.where === "transcript" ? "transcript" : r.where === "my notes" ? "mynotes" : "minutes"}">
-      <div class="t">${esc(m.title || "Teams meeting")} <span style="color:var(--muted);font-weight:400">· ${m.date ? esc(fmtShort(m.date)) : ""} · in ${esc(r.where)}</span></div>
-      <div class="s">...${hl(r.snippet)}...</div></button>`;
-  }
-  if (!res.length) html += `<div class="card empty"><b>Nothing found</b>Try another word.</div>`;
-  $("#main").innerHTML = html + "</div>";
+// ===================================================================== search (Ctrl+K)
+let palIndex = 0, palTimer, palSeq = 0;
+function openPalette() {
+  if (!SESSION || !$("#auth").hidden) return;
+  $("#palette").hidden = false; $("#q").value = ""; renderPalette([], ""); $("#q").focus();
 }
+function closePalette() { $("#palette").hidden = true; }
+function palItem(m, sub, tab, icon) {
+  return `<button type="button" class="pal-item" data-open="${m.id}" data-tab="${tab}" role="option">${icon}
+    <div style="min-width:0"><div class="t">${esc(m.title || "Teams meeting")}</div>${sub ? `<div class="s">${sub}</div>` : ""}</div>
+    <span class="d">${m.date ? esc(fmtShort(m.date)) : ""}</span></button>`;
+}
+function renderPalette(results, q) {
+  const box = $("#pal-res"), ql = q.toLowerCase();
+  const hl = (s) => esc(s).replace(new RegExp(esc(q).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), (x) => `<mark>${x}</mark>`);
+  let html = "";
+  if (!q) {
+    const recent = [...S.meetings].sort((a, b) => b.id.localeCompare(a.id)).slice(0, 7);
+    html = recent.length ? `<div class="pal-sec">Recent meetings</div>` + recent.map((m) => palItem(m, m.summary ? esc(m.summary) : "", "minutes", ICON.doc)).join("")
+      : `<div class="pal-empty">No meetings yet.</div>`;
+  } else {
+    const titles = S.meetings.filter((m) => (m.title || "").toLowerCase().includes(ql) || (m.people || []).some((p) => p.toLowerCase().includes(ql)))
+      .sort((a, b) => b.id.localeCompare(a.id)).slice(0, 6);
+    if (titles.length) html += `<div class="pal-sec">Meetings</div>` + titles.map((m) => palItem(m, m.people.length ? esc(m.people.join(", ")) : "", "minutes", ICON.doc)).join("");
+    const where = { transcript: ["transcript", ICON.mic], "my notes": ["mynotes", ICON.note] };
+    if (results.length) html += `<div class="pal-sec">Mentions</div>` + results.slice(0, 20).map((r) => {
+      const m = S.meetings.find((x) => x.id === r.id) || { id: r.id };
+      const [tab, icon] = where[r.where] || ["minutes", ICON.doc];
+      return palItem(m, `<span style="color:var(--faint)">In ${esc(r.where)}:</span> ...${hl(r.snippet)}...`, tab, icon);
+    }).join("");
+    if (!html) html = `<div class="pal-empty">Nothing matches “${esc(q)}”.</div>`;
+  }
+  box.innerHTML = html;
+  $$(".pal-item", box).forEach((el) => { el.querySelector(".t").innerHTML = q ? hl(el.querySelector(".t").textContent) : el.querySelector(".t").innerHTML; });
+  palIndex = 0; markPal();
+}
+function markPal() {
+  const items = $$("#pal-res .pal-item");
+  items.forEach((el, k) => { el.classList.toggle("on", k === palIndex); el.setAttribute("aria-selected", k === palIndex); });
+  if (items[palIndex]) items[palIndex].scrollIntoView({ block: "nearest" });
+}
+$("#q").addEventListener("input", () => {
+  const q = $("#q").value.trim(), seq = ++palSeq;
+  renderPalette([], q);
+  clearTimeout(palTimer);
+  if (!q) return;
+  palTimer = setTimeout(async () => {
+    const r = await api(`/api/search?q=${encodeURIComponent(q)}`);
+    const res = r.ok ? await r.json() : [];
+    if (seq === palSeq) renderPalette(res, q);
+  }, 220);
+});
+$("#q").addEventListener("keydown", (e) => {
+  const items = $$("#pal-res .pal-item");
+  if (e.key === "ArrowDown") { e.preventDefault(); palIndex = Math.min(items.length - 1, palIndex + 1); markPal(); }
+  if (e.key === "ArrowUp") { e.preventDefault(); palIndex = Math.max(0, palIndex - 1); markPal(); }
+  if (e.key === "Enter" && items[palIndex]) { e.preventDefault(); items[palIndex].click(); }
+});
+$("#palette").addEventListener("mousemove", (e) => {
+  const it = e.target.closest(".pal-item"); if (!it) return;
+  const k = $$("#pal-res .pal-item").indexOf(it); if (k !== palIndex) { palIndex = k; markPal(); }
+});
+$("#palette").addEventListener("mousedown", (e) => { if (e.target.id === "palette") closePalette(); });
+$("#search-btn").onclick = openPalette;
 
-// ===================================================================== shared clicks
+// ===================================================================== shared clicks and keys
 document.addEventListener("click", async (e) => {
+  const menuBtn = e.target.closest("[data-menu]");
+  $$(".menu").forEach((mn) => { if (!menuBtn || mn !== menuBtn.nextElementSibling) mn.hidden = true; });
+  if (menuBtn) { if (!menuBtn.disabled) menuBtn.nextElementSibling.hidden = !menuBtn.nextElementSibling.hidden; return; }
   const open = e.target.closest("[data-open]");
   if (open) { e.preventDefault(); return openMeeting(open.dataset.open, open.dataset.tab || "minutes"); }
   const ex = e.target.closest("[data-export]");
   if (ex && !ex.disabled) return exportFile(ex.dataset.export, ex.dataset.ids);
+  const rg = e.target.closest("[data-range]");
+  if (rg) return quickRange(rg.dataset.range);
+  const go = e.target.closest("[data-page-go]");
+  if (go) { S.page = go.dataset.pageGo; S.meetingId = null; renderMain(); $("#main").scrollTop = 0; return; }
+  const mine = e.target.closest("[data-mine]"); if (mine) { S.mineOnly = mine.dataset.mine === "1"; return renderActions(); }
+  const dn = e.target.closest("[data-done]"); if (dn) { S.showDone = dn.dataset.done === "1"; return renderActions(); }
+});
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); $("#palette").hidden ? openPalette() : closePalette(); return; }
+  if (e.key === "/" && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) && $("#palette").hidden) { e.preventDefault(); openPalette(); return; }
+  if (e.key === "Escape") { closePalette(); $("#settings").hidden = true; $$(".menu").forEach((mn) => { mn.hidden = true; }); }
 });
 document.addEventListener("change", async (e) => {
   const cb = e.target.closest("[data-act]"); if (!cb) return;
@@ -851,13 +1291,14 @@ document.addEventListener("change", async (e) => {
   const a = m.actions.find((x) => String(x.i) === idx); a.done = cb.checked;
   if (S.meeting && S.meeting.id === id) { const b = S.meeting.actions.find((x) => String(x.i) === idx); if (b) b.done = cb.checked; }
   await api(`/api/meetings/${id}/actions`, { method: "PUT", body: JSON.stringify({ done: m.actions.filter((x) => x.done).map((x) => x.i) }) });
-  if (!S.meetingId) setTimeout(renderOverview, 250); else renderMeeting();
+  if (cb.checked) toast("Marked as done.");
+  setTimeout(() => { if (S.meetingId) { renderSidebar(); renderMeeting(); } else renderMain(); }, 300);
 });
 async function exportFile(kind, ids) {
   toast(kind === "pdf" ? "Preparing the PDF..." : "Preparing the Word document...");
   const r = await api(`/api/export.${kind}?ids=${encodeURIComponent(ids)}`);
   if (!r.ok) {
-    if (kind === "pdf") { const w = window.open(`/print?ids=${encodeURIComponent(ids)}&dialog=1`); if (w) return; }
+    if (kind === "pdf" && !window.pywebview) { const w = window.open(`/print?ids=${encodeURIComponent(ids)}&dialog=1`); if (w) return; }
     return toast("Export failed. Is Notarius running?");
   }
   const cd = r.headers.get("Content-Disposition") || "";
@@ -865,7 +1306,8 @@ async function exportFile(kind, ids) {
   const url = URL.createObjectURL(await r.blob());
   const a = Object.assign(document.createElement("a"), { href: url, download: name }); document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
-  toast(`Saved “${name}” to your Downloads.`);
+  // The app window asks where to save; a browser puts it in Downloads.
+  if (!window.pywebview) toast(`Saved “${name}” to your Downloads.`);
 }
 
 // ===================================================================== data + polling
@@ -876,12 +1318,12 @@ async function refreshData(force = false) {
     const next = ms.ok ? await ms.json() : S.meetings;
     const changed = JSON.stringify(next) !== JSON.stringify(S.meetings);
     S.meetings = next;
-    renderStatus();
+    renderStatus(); renderSidebar();
     if (!changed && !force) return;
     renderCalendar();
     const typing = document.activeElement && /TEXTAREA|INPUT/.test(document.activeElement.tagName) && document.activeElement.id !== "q";
-    if (typing) return;
-    if (S.meetingId) await loadMeeting(); else if (!S.query) renderOverview();
+    if (typing || !$("#palette").hidden) return;
+    if (S.meetingId) await loadMeeting(); else renderMain();
   } catch { S.status = null; renderStatus(); }
 }
 
@@ -895,15 +1337,17 @@ async function renderPrint() {
     const m = await r.json(); if (!m.notes) continue;
     const acts = m.actions || [];
     const div = document.createElement("div"); div.className = "pdoc md";
-    div.innerHTML = `<h1>${esc(m.title || "Teams meeting")}</h1>
+    div.innerHTML = `<div class="pbrand"><img src="/logo.svg" alt="">Notarius<span>· Minutes of meeting</span></div>
+      <h1>${esc(m.title || "Teams meeting")}</h1>
       <div class="pmeta">${esc(fmtDay(m.date))} · ${m.start}${m.end ? "–" + m.end : ""}${m.duration_min ? " · " + m.duration_min + " min" : ""}</div>
       ${md(minutesBody(m.notes))}
-      ${acts.length ? `<h2>Action Items</h2><table><tr><th>#</th><th>Action</th><th>Owner</th><th>Due</th><th>Status</th></tr>${acts.map((a, k) =>
-        `<tr><td>${k + 1}</td><td>${inline(esc(a.action))}</td><td>${esc(a.owner)}</td><td>${esc(a.due)}</td><td>${a.done ? "Done" : "Open"}</td></tr>`).join("")}</table>` : ""}
+      ${acts.length ? `<h2>Action Items</h2><table><thead><tr><th>#</th><th>Action</th><th>Owner</th><th>Due</th><th>Status</th></tr></thead><tbody>${acts.map((a, k) =>
+        `<tr><td>${k + 1}</td><td>${inline(esc(a.action))}</td><td>${esc(a.owner)}</td><td>${esc(a.due)}</td><td>${a.done ? "Done" : "Open"}</td></tr>`).join("")}</tbody></table>` : ""}
       ${m.my_notes && m.my_notes.trim() ? `<h2>My notes</h2>${m.my_notes.split("\n").map((l) => `<p>${esc(l)}</p>`).join("")}` : ""}`;
     document.body.appendChild(div);
   }
-  document.title = "Minutes";
+  const titles = [...document.querySelectorAll(".pdoc h1")].map((h) => h.textContent);
+  document.title = titles.length === 1 ? titles[0] : "Meeting minutes";  // the PDF's title
   if (params.get("dialog")) setTimeout(() => window.print(), 300);
 }
 
@@ -913,7 +1357,7 @@ const pinInputs = [...document.querySelectorAll("#pin input")];
 const pinValue = () => pinInputs.map((i) => i.value).join("");
 function clearPin() { pinInputs.forEach((i) => { i.value = ""; }); pinInputs[0].focus(); }
 function setAuthText() {
-  const t = { login: ["Notarius is locked", "Enter your 4-digit PIN."],
+  const t = { login: ["Welcome back", "Enter your 4-digit PIN to open your meetings."],
               setup1: ["Protect your notes", "Choose a 4-digit PIN. You'll enter it to open your meetings."],
               setup2: ["Confirm your PIN", "Enter the same 4 digits again."] }[pinStage];
   $("#auth-title").textContent = t[0]; $("#auth-sub").textContent = t[1];
@@ -924,8 +1368,8 @@ let authInfo = {};
 function showRecover(on) {
   $("#recover").hidden = !on; $("#pin").hidden = on; $("#forgot-wrap").hidden = on || !authInfo.has_recovery;
   $("#auth-err").textContent = ""; $("#rec-err").textContent = "";
-  $("#auth-title").textContent = on ? "Reset your PIN" : "Notarius is locked";
-  $("#auth-sub").textContent = on ? "Enter the recovery key you saved when you set your PIN, then choose a new PIN." : "Enter your 4-digit PIN.";
+  $("#auth-title").textContent = on ? "Reset your PIN" : "Welcome back";
+  $("#auth-sub").textContent = on ? "Enter the recovery key you saved when you set your PIN, then choose a new PIN." : "Enter your 4-digit PIN to open your meetings.";
   setTimeout(() => (on ? $("#rec-key") : pinInputs[0]).focus(), 50);
 }
 $("#forgot").onclick = () => showRecover(true);
@@ -959,9 +1403,9 @@ async function refreshLockState() {
   try {
     const st = await (await fetch("/api/status", { headers: { "X-Notetaker": "1" } })).json();
     const el = $("#lock-state"); el.hidden = pinStage !== "login";
-    el.className = "lockstate" + (st.recording ? " rec" : "");
+    el.className = "lockstate" + (st.recording ? " rec" : st.paused || st.processing ? " busy" : st.watching ? "" : " off");
     el.innerHTML = '<span class="dot"></span>' + esc(st.paused ? "Paused: not taking notes" : st.recording ? "Recording a Teams call (notes are saved while locked)"
-      : st.processing ? "Writing minutes..." : st.watching ? "Watching for Teams calls, even while locked" : "Not watching for calls");
+      : st.processing ? "Writing minutes..." : st.watching ? "Listening for Teams calls, even while locked" : "Not watching for calls");
   } catch (e) { $("#lock-state").hidden = true; }
 }
 function showAuth(setup) {
@@ -970,8 +1414,9 @@ function showAuth(setup) {
   pinStage = setup ? "setup1" : "login"; firstPin = "";
   $("#auth").hidden = false; $("#auth-err").textContent = "";
   $("#recover").hidden = true; $("#pin").hidden = false;
+  closePalette();
   setAuthText();
-  document.querySelectorAll(".top, .layout").forEach((e) => e.setAttribute("inert", ""));
+  $("#app").setAttribute("inert", "");
   pinInputs.forEach((i) => { i.value = ""; });
   setTimeout(() => pinInputs[0].focus(), 50);
 }
@@ -997,7 +1442,7 @@ async function submitPin() {
 }
 function unlocked(firstTime) {
   $("#auth").hidden = true;
-  document.querySelectorAll(".top, .layout").forEach((el) => el.removeAttribute("inert"));
+  $("#app").removeAttribute("inert");
   if (firstTime) toast("PIN set. Your notes are now encrypted on this laptop.");
   if (!booted) boot(); else refreshData(true);
 }
@@ -1026,7 +1471,7 @@ async function lockNow() {
   if (!SESSION) return;
   await api("/api/auth/logout", { method: "POST" }).catch(() => {});
   SESSION = null; S.meeting = null; $("#main").innerHTML = "";
-  ["#settings", "#rk-screen", "#tour"].forEach((s) => { $(s).hidden = true; });
+  ["#settings", "#rk-screen", "#tour", "#palette"].forEach((s) => { $(s).hidden = true; });
   showAuth(false);
 }
 $("#lock").onclick = lockNow;
@@ -1050,6 +1495,7 @@ $("#open-settings").onclick = async () => {
   await loadSettings(); const s = S.settings || {};
   $("#set-name").value = s.my_name || ""; $("#set-spoken").value = s.spoken_language || "auto"; $("#set-minutes").value = s.minutes_language || "English"; $("#set-captions").checked = s.teams_captions !== false;
   $("#set-old").value = ""; $("#set-new").value = ""; $("#set-err").textContent = "";
+  $("#set-version").textContent = s.version ? `Notarius ${s.version}` : "";
   showVoices();
   $("#settings").hidden = false; $("#set-name").focus();
 };
@@ -1072,13 +1518,12 @@ $("#new-rk").onclick = async () => {
   if (!r.ok || !j.recovery_key) { $("#set-err").textContent = j.error || "Couldn't create a recovery key."; return; }
   $("#settings").hidden = true; showRecoveryKey(j.recovery_key);
 };
-$("#settings").addEventListener("click", (e) => { if (e.target.id === "settings") $("#settings").hidden = true; });
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("#settings").hidden = true; });
+$("#settings").addEventListener("mousedown", (e) => { if (e.target.id === "settings") $("#settings").hidden = true; });
 $("#settings-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   if ($("#set-new").value || $("#set-old").value) {
     const r = await api("/api/auth/change", { method: "POST", body: JSON.stringify({ password: $("#set-old").value, new_password: $("#set-new").value }) });
-    if (!r.ok) { $("#set-err").textContent = (await r.json().catch(() => ({}))).error || "Couldn't change the password."; return; }
+    if (!r.ok) { $("#set-err").textContent = (await r.json().catch(() => ({}))).error || "Couldn't change the PIN."; return; }
   }
   const r = await api("/api/settings", { method: "PUT", body: JSON.stringify({ my_name: $("#set-name").value, spoken_language: $("#set-spoken").value, minutes_language: $("#set-minutes").value, teams_captions: $("#set-captions").checked }) });
   if (!r.ok) { $("#set-err").textContent = "Couldn't save the settings."; return; }
@@ -1086,17 +1531,15 @@ $("#settings-form").addEventListener("submit", async (e) => {
 });
 
 // ===================================================================== guided tour
+const TOUR_KEY = "notarius.tour.v2";  // new key when the layout changes, so everyone sees the new tour once
 const TOUR = [
-  { sel: ".brand", title: "Welcome to Notarius", text: "Named after the notarii, the scribes of ancient Rome who wrote down every word of a meeting. Notarius records your Teams calls on this laptop and writes the minutes when you leave. No bot joins the call." },
-  { sel: "#state", title: "It listens for Teams", text: "When you join a Teams call this turns red and recording starts on its own, muted or not. A minute or two after you leave, the minutes appear here." },
-  { sel: ".side", title: "Your meetings, by day", text: "Days with meetings show a count. Click a day, or drag across several days to see them together." },
-  { sel: "#ranges", title: "Quick ranges", text: "Jump to today, this week, the last 7 days, or everything." },
-  { sel: "#main", title: "Meetings and action items", text: "Each meeting shows a short summary. Open one for the full minutes, the transcript, who spoke, and your own notes. Tick off action items as you finish them, and export to Word or PDF." },
-  { sel: ".search", title: "Search everything", text: "Find any word across all minutes, transcripts and your notes." },
-  { sel: "#pause", title: "Pause when needed", text: "Pause before a call you don't want recorded. A call already being recorded is stopped and not saved." },
-  { sel: "#theme", title: "Light or dark", text: "Switch between light and dark. Until you choose, Notarius follows your Windows setting." },
-  { sel: "#open-settings", title: "Settings", text: "Your name, the language people speak (English, Urdu, Hindi, or automatic for mixed calls), English or Roman Urdu minutes, your PIN and your recovery key." },
-  { sel: "#lock", title: "Lock", text: "Locks the dashboard. Your notes and transcripts stay encrypted on this laptop." },
+  { sel: ".sb-brand", title: "Welcome to Notarius", text: "Named after the notarii, the scribes of ancient Rome who wrote down every word of a meeting. Notarius records your Teams calls on this laptop and writes the minutes when you leave. No bot joins the call." },
+  { sel: "#status-card", title: "It listens for Teams", text: "When you join a Teams call this turns red and recording starts on its own, muted or not. Pause here before a call you don't want recorded." },
+  { sel: "#main", title: "Your meetings", text: "Every meeting with a short summary, newest first. Open one for the full minutes, the transcript, who spoke, and your own notes." },
+  { sel: "#search-btn", title: "Search everything", text: "Press Ctrl+K anywhere to find any word across all minutes, transcripts and your notes." },
+  { sel: "#nav-actions", title: "Action items", text: "Every action item from every meeting in one list. Tick them off as you finish them, or show only yours." },
+  { sel: "#mini-cal", title: "Jump to a day", text: "Dots mark days with meetings. Click a day, or drag across several days to see them together." },
+  { sel: "#user-row", title: "Settings, theme and lock", text: "Your name and languages, light or dark, and Lock, which hides everything until you enter your PIN." },
   { sel: "#tour-btn", title: "That's the tour", text: "Click this button any time to see it again." },
 ];
 let tourStep = 0;
@@ -1105,14 +1548,17 @@ function placeTour() {
   if (!el) return;
   el.scrollIntoView({ block: "nearest" });
   const r = el.getBoundingClientRect(), pad = 6;
-  Object.assign(spot.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + 2 * pad}px`, height: `${Math.min(r.height, innerHeight - 40) + 2 * pad}px` });
+  const box = { x: r.left - pad, y: r.top - pad, w: r.width + 2 * pad, h: Math.min(r.height, innerHeight - 40) + 2 * pad };
+  Object.assign(spot.style, { left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px` });
+  // Dim everything except the highlighted part (a huge box-shadow isn't drawn by WebView2).
+  $("#tour-scrim").style.clipPath = `path(evenodd, "M0 0H${innerWidth}V${innerHeight}H0Z M${box.x} ${box.y}h${box.w}v${box.h}h${-box.w}Z")`;
   card.innerHTML = `<h3>${esc(step.title)}</h3><p>${esc(step.text)}</p><div class="tour-foot"><span class="count">${tourStep + 1} of ${TOUR.length}</span>`
-    + (tourStep ? '<button class="btn" id="tour-back">Back</button>' : '<button class="btn" id="tour-skip">Skip</button>')
-    + `<button class="btn primary" id="tour-next">${tourStep === TOUR.length - 1 ? "Done" : "Next"}</button></div>`;
+    + (tourStep ? '<button type="button" class="btn" id="tour-back">Back</button>' : '<button type="button" class="btn" id="tour-skip">Skip</button>')
+    + `<button type="button" class="btn primary" id="tour-next">${tourStep === TOUR.length - 1 ? "Done" : "Next"}</button></div>`;
   const cw = card.offsetWidth, ch = card.offsetHeight, vw = innerWidth, vh = innerHeight;
   let top = r.bottom + 14, left = Math.min(Math.max(16, r.left), vw - cw - 16);
   if (top + ch > vh - 16) top = r.top - ch - 14;
-  if (top < 16) {
+  if (top < 16 || r.height > vh * .6) {
     top = Math.max(16, Math.min(vh - ch - 16, r.top + 20));
     left = r.right + 14 + cw < vw ? r.right + 14 : Math.max(16, Math.min(vw - cw - 16, r.left + 20));
   }
@@ -1124,7 +1570,7 @@ function placeTour() {
   $("#tour-next").focus();
 }
 function startTour() { tourStep = 0; $("#tour").hidden = false; placeTour(); }
-function endTour() { $("#tour").hidden = true; try { localStorage.setItem("notarius.tour", "done"); } catch (e) {} }
+function endTour() { $("#tour").hidden = true; try { localStorage.setItem(TOUR_KEY, "done"); } catch (e) {} }
 $("#tour-btn").onclick = startTour;
 addEventListener("resize", () => { if (!$("#tour").hidden) placeTour(); });
 document.addEventListener("keydown", (e) => {
@@ -1145,18 +1591,13 @@ document.addEventListener("keydown", (e) => {
 async function boot() {
   booted = true;
   await loadSettings();
+  S.seen = loadSeen();
   await refreshData(true);
+  if (!S.seen) { S.seen = new Set(S.meetings.map((m) => m.id)); saveSeen(); renderMain(); }  // first run: what's there now isn't "new"
   const target = S.meetings.find((m) => m.id === location.hash.slice(1));
-  if (target) { await openMeeting(target.id); }
-  else {
-    const today = ymd(new Date());
-    if (!S.meetings.some((m) => m.date === today) && S.meetings.length) {
-      const last = S.meetings[S.meetings.length - 1].date;
-      S.sel = new Set([last]); S.range = null; S.view = parseYmd(last); S.view.setDate(1);
-    }
-    renderCalendar(); renderOverview();
-  }
-  let seen = null; try { seen = localStorage.getItem("notarius.tour"); } catch (e) {}
+  if (target) await openMeeting(target.id);
+  else { renderCalendar(); renderMain(); }
+  let seen = null; try { seen = localStorage.getItem(TOUR_KEY); } catch (e) {}
   if (!seen) setTimeout(startTour, 700);
   setInterval(() => { renderStatus(); }, 1000);
   setInterval(() => { if ($("#auth").hidden) refreshData(false); }, 4000);
