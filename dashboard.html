@@ -155,6 +155,8 @@ textarea.notes { width: 100%; min-height: 160px; resize: vertical; border: 1px s
 .banner.warn { background: var(--warn-soft); color: var(--warn); }
 .banner .btn { margin-left: auto; }
 .people { padding: 14px 16px; margin-bottom: 16px; }
+.people-line { color: var(--muted); font-size: 13.5px; margin: -4px 0 14px; }
+.people-line .linkbtn { font-size: 13.5px; }
 .people-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .people-head b { font-size: 15px; }
 .people-head span { color: var(--muted); font-size: 12.5px; }
@@ -708,23 +710,20 @@ function renderMeeting() {
     : m.transcript ? "Writing the minutes from the transcript" : "Transcribing and writing the minutes"}. This page updates by itself.</div>`;
   if (m.status === "recording") html += `<div class="banner bad">This call is being recorded right now. Minutes appear a minute or two after you leave.</div>`;
 
-  const nameable = (m.speakers || []).filter((p) => p.nameable);
-  if (nameable.length) {
-    html += `<div class="card people"><div class="people-head"><b>People in this meeting</b>
-      <span>Name a voice once and it's recognized in future meetings.</span></div>`;
-    for (const p of m.speakers) {
-      const value = p.name || p.suggested || "";
-      const badge = p.auto ? '<span class="badge voice">Recognized by voice</span>' : p.suggested && !p.name ? '<span class="badge sugg">Suggested from the conversation</span>' : "";
-      const ph = p.id === "ME" ? "Your name" : `Name for Speaker ${p.id.slice(1)}`;
-      html += `<div class="person"><span class="sw" style="background:${colorFor(p.id)}"></span>
-        ${p.nameable ? `<input data-speaker="${p.id}" value="${esc(value)}" data-orig="${esc(p.id === "ME" ? (p.name || "") : (p.name || ""))}" placeholder="${esc(ph)}" aria-label="${esc(ph)}">` : `<b>${esc(p.label)}</b>`}
-        <div class="info">${badge}${p.id === "ME" ? "You" : esc(p.label)} · talked ${fmtMins(p.seconds)}${p.sample ? `<q>${esc(p.sample)}</q>` : ""}</div></div>`;
-    }
-    html += `<div class="people-foot"><button class="btn primary" id="save-names" disabled>Save names and update minutes</button></div></div>`;
+  const people = m.speakers || [];
+  const nameable = people.filter((p) => p.nameable);
+  const meName = (p) => p.name || (S.status && S.status.my_name !== "Me" && S.status.my_name) || "You";
+  const named = [...new Set(people.filter((p) => p.id === "ME" || p.name).map((p) => (p.id === "ME" ? meName(p) : p.name)))];
+  const unnamed = people.filter((p) => p.id !== "ME" && !p.name).length;
+  if (people.length) {
+    html += `<div class="people-line">${named.length ? `With ${esc(named.join(", "))}` : "Speakers not named yet"}`
+      + (unnamed && nameable.length ? ` · <button type="button" class="linkbtn" data-tab="people">${plural(unnamed, "unnamed voice")}: name them</button>` : "")
+      + `</div>`;
   }
 
   const acts = m.actions || [];
-  const tabs = [["minutes", "Minutes"], ["actions", `Action items${acts.length ? ` (${acts.filter((a) => !a.done).length})` : ""}`], ["transcript", "Transcript"], ["mynotes", "My notes"]];
+  const tabs = [["minutes", "Minutes"], ["actions", `Action items${acts.length ? ` (${acts.filter((a) => !a.done).length})` : ""}`], ["transcript", "Transcript"],
+                ...(nameable.length ? [["people", `People (${people.length})`]] : []), ["mynotes", "My notes"]];
   html += `<div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab ${S.tab === k ? "on" : ""}" role="tab" aria-selected="${S.tab === k}" data-tab="${k}">${l}</button>`).join("")}</div>`;
   if (S.tab === "minutes") {
     const langs = (S.settings && S.settings.minutes_languages) || ["English", "Roman Urdu"];
@@ -737,6 +736,24 @@ function renderMeeting() {
   if (S.tab === "actions") html += acts.length ? `<div class="card actions">${acts.map((a) => actionRow(m, a, false)).join("")}</div>` : `<div class="card empty"><b>No action items</b>Nothing was assigned in this meeting.</div>`;
   if (S.tab === "transcript") html += m.transcript ? `<div class="card tr">${transcriptHtml(m)}</div>` : `<div class="card empty"><b>No transcript yet</b></div>`;
   if (S.tab === "mynotes") html += `<label class="sr" for="mynotes">My notes</label><textarea class="notes" id="mynotes" style="min-height:320px" placeholder="Your own notes for this meeting. They're saved automatically and included in exports.">${esc(m.my_notes || "")}</textarea><div class="save-state" id="mynotes-state"></div>`;
+  if (S.tab === "people" && nameable.length) {
+    const row = (p) => {
+      const value = p.name || p.suggested || "";
+      const badge = p.auto ? '<span class="badge voice">Recognized by voice</span>' : p.suggested && !p.name ? '<span class="badge sugg">Suggested from the conversation</span>' : "";
+      const ph = p.id === "ME" ? "Your name" : `Name for Speaker ${p.id.slice(1)}`;
+      return `<div class="person"><span class="sw" style="background:${colorFor(p.id)}"></span>
+        ${p.nameable ? `<input data-speaker="${p.id}" value="${esc(value)}" data-orig="${esc(p.name || "")}" placeholder="${esc(ph)}" aria-label="${esc(ph)}">` : `<b>${esc(p.label)}</b>`}
+        <div class="info">${badge}${p.id === "ME" ? "You" : esc(p.label)} · talked ${fmtMins(p.seconds)}${p.sample ? `<q>${esc(p.sample)}</q>` : ""}</div></div>`;
+    };
+    const main = people.filter((p) => p.id === "ME" || p.name || p.seconds >= 5);
+    const tiny = people.filter((p) => !main.includes(p));
+    html += `<div class="card people"><div class="people-head"><b>People in this meeting</b>
+      <span>Name a voice once and it's recognized in future meetings. If one person shows up twice, give both the same name.</span></div>`
+      + main.map(row).join("")
+      + (tiny.length ? `<div id="tiny-people" ${S.showTiny ? "" : "hidden"}>${tiny.map(row).join("")}</div>
+          <button type="button" class="toggle-done" id="toggle-tiny" style="padding-left:0">${S.showTiny ? "Hide" : "Show"} ${plural(tiny.length, "more voice")} with only a few seconds of speech</button>` : "")
+      + `<div class="people-foot"><button class="btn primary" id="save-names" disabled>Save names and update minutes</button></div></div>`;
+  }
   $("#main").innerHTML = html;
   wireMeeting(m);
 }
@@ -760,6 +777,11 @@ function wireMeeting(m) {
     if (r.ok) { toast(j.cached ? `Switched to ${b.dataset.lang}.` : `Writing the minutes in ${b.dataset.lang}. This takes a few seconds.`); await refreshData(true); }
     else toast(j.error || "Couldn't rewrite the minutes");
   });
+  const tt = $("#toggle-tiny");
+  if (tt) tt.onclick = () => {
+    S.showTiny = !S.showTiny; $("#tiny-people").hidden = !S.showTiny;
+    tt.textContent = tt.textContent.replace(/^(Show|Hide)/, S.showTiny ? "Hide" : "Show");
+  };
   const inputs = [...document.querySelectorAll("[data-speaker]")], save = $("#save-names");
   const dirty = () => inputs.some((i) => i.value.trim() !== i.dataset.orig);
   inputs.forEach((i) => { i.oninput = () => { save.disabled = !dirty(); }; i.onkeydown = (e) => { if (e.key === "Enter" && dirty()) save.click(); }; });
