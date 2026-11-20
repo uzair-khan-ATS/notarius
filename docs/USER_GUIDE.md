@@ -222,7 +222,9 @@ working. Without the PIN or the recovery key, the notes can't be recovered.
 | The dashboard doesn't open | Make sure Notarius is running (tray icon). Start it from the Start menu, then open http://127.0.0.1:8765. |
 | "Too many attempts" | After 5 wrong PINs the lock screen pauses, starting at 15 seconds and doubling each time. |
 | Windows blocked Notarius.exe | That's Smart App Control; use install option A. |
-| My voice is mixed into "Others" | Use a headset. On laptop speakers the mic also picks up the call. |
+| Other people's words under my name | Your mic also hears the call through your speakers or headset. Notarius removes words on your mic that match the call audio at the same moment, so this should be rare. A headset with little leakage helps. |
+| Something I said while muted is in the notes | Teams mute doesn't switch off your microphone, and Notarius can't read Teams' mute state yet. For a private side conversation, use **Pause** in the tray or dashboard. |
+| The same person appears as two speakers | Give both the same name in the **People** tab; they're merged, and the voice is remembered. |
 
 The log is at `%LOCALAPPDATA%\Notarius\notetaker.log`. It records events and timings, never what
 was said.

@@ -853,6 +853,136 @@ def split_by_speaker(segments, turns) -> list[dict]:
     return [o for o in out if o["text"]]
 
 
+# Speaker separation with one similarity threshold splits a person into several voices when their
+# call audio varies (codec, mic, level). A clean-up that reuses the fingerprints already computed,
+# so it adds no processing time: fold voices with only a few seconds of speech into the voice they
+# most resemble, and merge voices that are near-identical or recognized as the same named person.
+MERGE_SIM = 0.86          # two voices this similar are one person (different people measured up to 0.83)
+TINY_S = 5.0              # a voice with less speech than this is folded into another
+
+
+def merge_speakers(turns: list, speakers: dict[str, dict]) -> tuple[list, dict[str, dict]]:
+    """Merge over-split speakers; returns relabelled turns (S1 = first to speak) and profiles."""
+    import numpy as np
+
+    sp = {k: dict(v) for k, v in speakers.items()}
+    vec = {k: np.asarray(v["embedding"], dtype=np.float32) for k, v in sp.items() if v.get("embedding")}
+    alias: dict[str, str] = {}
+
+    def merge(drop: str, keep: str) -> None:
+        alias[drop] = keep
+        a, b = sp[keep]["seconds"], sp[drop]["seconds"]
+        if drop in vec:
+            v = vec[keep] * a + vec[drop] * b if keep in vec else vec[drop]
+            vec[keep] = v / (np.linalg.norm(v) or 1.0)
+            vec.pop(drop)
+        sp[keep]["seconds"] = round(a + b, 1)
+        del sp[drop]
+
+    while True:  # most similar mergeable pair first
+        keys, best = [k for k in sp if k in vec], None
+        for i, a in enumerate(keys):
+            for b in keys[i + 1:]:
+                sim = float(vec[a] @ vec[b])
+                if sim >= MERGE_SIM and (not best or sim > best[0]):
+                    best = (sim, a, b)
+        if not best:
+            break
+        _, a, b = best
+        merge(*((b, a) if sp[a]["seconds"] >= sp[b]["seconds"] else (a, b)))
+
+    def resolve(lab: str) -> str:
+        while lab in alias:
+            lab = alias[lab]
+        return lab
+
+    for lab in sorted(sp, key=lambda k: sp[k]["seconds"]):  # near-silent voices
+        if lab not in sp or sp[lab]["seconds"] >= TINY_S or len(sp) <= 1:
+            continue
+        others = [k for k in sp if k != lab]
+        if lab in vec and any(k in vec for k in others):
+            target = max((k for k in others if k in vec), key=lambda k: float(vec[lab] @ vec[k]))
+        else:  # no usable fingerprint: whoever spoke right before (or after) it
+            seq = [resolve(t[2]) for t in turns]
+            near = [seq[i - 1] for i, x in enumerate(seq) if x == lab and i > 0 and seq[i - 1] != lab] or \
+                   [seq[i + 1] for i, x in enumerate(seq) if x == lab and i + 1 < len(seq) and seq[i + 1] != lab]
+            target = max(set(near), key=near.count) if near else max(others, key=lambda k: sp[k]["seconds"])
+        merge(lab, resolve(target))
+
+    merged: list[list] = []
+    for s, e, lab in turns:
+        lab = resolve(lab)
+        if merged and merged[-1][2] == lab and s - merged[-1][1] < 0.5:
+            merged[-1][1] = max(merged[-1][1], e)
+        else:
+            merged.append([s, e, lab])
+    order: dict[str, str] = {}
+    for _, _, lab in merged:
+        order.setdefault(lab, f"S{len(order) + 1}")
+    out_turns = [(s, e, order[lab]) for s, e, lab in merged]
+    out_speakers = {}
+    for lab, new in order.items():
+        prof = sp[lab]
+        if lab in vec:
+            prof["embedding"] = [round(float(x), 5) for x in vec[lab]]
+        out_speakers[new] = prof
+    return out_turns, out_speakers
+
+
+# Your microphone also hears the call (speakers, or a headset that leaks), and Teams' mute does
+# not mute the device. Words on the mic that match the call audio at the same moment are echo.
+ECHO_WINDOW_S = 1.5
+
+
+def _norm_word(w: str) -> str:
+    return re.sub(r"[^\w]", "", w.lower())
+
+
+def regroup_words(words: list, gap: float = 0.8) -> list[dict]:
+    """Rebuild sentence-sized segments from timed words, breaking at pauses."""
+    out: list[dict] = []
+    for ws, we, w in words:
+        if out and ws - out[-1]["end"] <= gap:
+            out[-1]["end"], out[-1]["text"] = we, out[-1]["text"] + w
+            out[-1]["words"].append((ws, we, w))
+        else:
+            out.append({"start": ws, "end": we, "text": w, "words": [(ws, we, w)]})
+    for o in out:
+        o["text"] = o["text"].strip()
+    return [o for o in out if o["text"]]
+
+
+def remove_echo(mine: list[dict], call: list[dict]) -> tuple[list[dict], int]:
+    """Your mic's segments without the call's words leaking into it; returns (segments, words dropped)."""
+    call_words = sorted((ws, _norm_word(w)) for seg in call for ws, _, w in seg.get("words") or [] if _norm_word(w))
+    times = [t for t, _ in call_words]
+    spans = sorted((seg["start"], seg["end"]) for seg in call)
+    kept, dropped = [], 0
+    for seg in mine:
+        words = seg.get("words") or [(seg["start"], seg["end"], " " + seg["text"])]
+        hit = []
+        for ws, _, w in words:
+            n = _norm_word(w)
+            lo, hi = bisect.bisect_left(times, ws - ECHO_WINDOW_S), bisect.bisect_right(times, ws + ECHO_WINDOW_S)
+            hit.append(bool(n) and any(call_words[k][1] == n for k in range(lo, hi)))
+        for i, word in enumerate(words):
+            # a run of matching words is the call leaking in; one matching word is a coincidence
+            if hit[i] and ((i > 0 and hit[i - 1]) or (i + 1 < len(hit) and hit[i + 1])):
+                dropped += 1
+            else:
+                kept.append(word)
+
+    def during_call_speech(seg: dict) -> bool:
+        i = bisect.bisect_right(spans, (seg["start"], float("inf"))) - 1
+        return i >= 0 and spans[i][0] <= seg["start"] <= spans[i][1] + 0.5
+
+    # crumbs left inside echoed speech (one or two misheard words) are echo too
+    regrouped = regroup_words(kept)
+    out = [s for s in regrouped if len(s["words"]) > 2 or not during_call_speech(s)]
+    dropped += sum(len(s["words"]) for s in regrouped) - sum(len(s["words"]) for s in out)
+    return out, dropped
+
+
 def speaker_label(who: str, speakers: dict, me: str) -> str:
     if who == "ME":
         return me
@@ -1021,8 +1151,32 @@ def run_diarization(wav: Path, out: Path) -> None:
     audio = decode_audio(str(wav), sampling_rate=16000)
     turns = diarize(audio, threads)
     speakers = speaker_profiles(audio, turns, threads)
+    before = len(speakers)
+    turns, speakers = merge_speakers(turns, speakers)
     recognize_voices(speakers)
+    turns, speakers = merge_same_names(turns, speakers)
+    log(f"  speaker separation: {before} voice(s) found, {len(speakers)} after clean-up")
     write_json(out, {"turns": turns, "speakers": speakers})
+
+
+def merge_same_names(turns: list, speakers: dict[str, dict]) -> tuple[list, dict[str, dict]]:
+    """Two voices recognized as the same named person are one speaker."""
+    by_name: dict[str, str] = {}
+    alias: dict[str, str] = {}
+    for lab in sorted(speakers, key=lambda k: -speakers[k]["seconds"]):
+        name = speakers[lab].get("name")
+        if name and name in by_name:
+            keep = by_name[name]
+            alias[lab] = keep
+            speakers[keep]["seconds"] = round(speakers[keep]["seconds"] + speakers[lab]["seconds"], 1)
+        elif name:
+            by_name[name] = lab
+    if not alias:
+        return turns, speakers
+    kept = {k: v for k, v in speakers.items() if k not in alias}
+    order: dict[str, str] = {}
+    new_turns = [(s, e, order.setdefault(alias.get(lab, lab), f"S{len(order) + 1}")) for s, e, lab in turns]
+    return new_turns, {order[k]: v for k, v in kept.items() if k in order}
 
 
 def _start_diarization(meeting_dir: Path):
@@ -1212,10 +1366,14 @@ def _transcribe_and_write(meeting_dir: Path, device: str) -> None:
         call: list[dict] = []
         if _usable(meeting_dir / "mic.wav"):
             log(f"transcribing your mic ({WHISPER_MODEL} on {device})")
-            mine = tr.track(decode_audio(str(meeting_dir / "mic.wav"), sampling_rate=16000))
+            mine = tr.track(decode_audio(str(meeting_dir / "mic.wav"), sampling_rate=16000), words=True)
         if _usable(meeting_dir / "others.wav"):
             log(f"transcribing the call audio ({WHISPER_MODEL} on {device})")
             call = tr.track(decode_audio(str(meeting_dir / "others.wav"), sampling_rate=16000), words=True)
+        heard = sum(len(s["words"]) for s in mine)
+        mine, echoed = remove_echo(mine, call)
+        if echoed:
+            log(f"  removed {echoed} of {heard} words from your mic that were the call audio (echo)")
         del tr  # free the GPU before the (CPU) wait below
         log(f"transcribed in {time.monotonic() - t0:.0f}s")
     except BaseException:

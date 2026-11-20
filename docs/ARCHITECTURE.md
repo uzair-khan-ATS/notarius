@@ -54,12 +54,28 @@ shared clock. This keeps the two tracks aligned in time.
 3. **Batched GPU transcription.** faster-whisper `large-v3-turbo` runs in fp16 on CUDA through
    `BatchedInferencePipeline`, at about 1 minute per hour of audio on an RTX 4050. It falls back
    to sequential decoding on error, and to int8 on the CPU if CUDA fails.
-4. **Speaker labels.** Separation uses sherpa-onnx with pyannote segmentation 3.0 and WeSpeaker
+4. **Echo removal on your mic.** Your microphone also hears the call (speakers, or a headset that
+   leaks), and Teams mute doesn't mute the device. Both tracks are transcribed with word
+   timestamps. A run of two or more words on your mic that matches call-audio words within
+   ±1.5 s is the call leaking in, and is dropped. A single matching word is a coincidence, which
+   keeps your own words when you talk over someone. One- or two-word leftovers inside call speech
+   are dropped too. Your remaining words are regrouped into sentences at pauses, so talk time is
+   measured from words, not from Whisper's 30-second batches.
+5. **Speaker labels.** Separation uses sherpa-onnx with pyannote segmentation 3.0 and WeSpeaker
    ResNet34 embeddings, giving "who spoke when". Call-track words are assigned to speakers by
-   their timestamps, and one-word flips at turn boundaries are smoothed out. Each speaker's voice
-   fingerprint is compared with the voices you have named before (cosine ≥ 0.5) to name them
-   automatically.
-5. **Minutes first, names later.** If separation isn't done 20 seconds after transcription, the
+   their timestamps, and one-word flips at turn boundaries are smoothed out.
+
+   A fixed clustering threshold over-splits people whose call audio varies. A clean-up step
+   reuses the fingerprints already computed, so it adds no processing time:
+   - voices with under 5 s of speech fold into the voice they resemble most;
+   - voices whose averaged fingerprints are ≥ 0.86 similar merge (different people measured up
+     to 0.83);
+   - voices recognized as the same named person merge.
+
+   On a synthetic test with varying audio this took 4 people from 6 speakers to 4, and 2 people
+   from 3 to 2. Each speaker's fingerprint is compared with the voices you have named before
+   (cosine ≥ 0.5) to name them automatically.
+6. **Minutes first, names later.** If separation isn't done 20 seconds after transcription, the
    minutes are written straight away with the call audio as "Others". They are rewritten with
    speakers when separation finishes. In practice this applies to long meetings, since
    separation runs at about 1/6 of real time.
