@@ -9,22 +9,31 @@
 - Calendar dashboard, search, and Word/PDF export.
 - PIN lock, recovery key, encryption at rest, and a tray app.
 
-## Next
+## Next (in priority order)
 
-- **Its own app window instead of a browser tab.** Opening Notarius shows the dashboard in a
-  window with the Notarius icon and its own taskbar entry, like any Windows app. Options: a native
-  window with the built-in Edge WebView2 (for example pywebview), or Edge's app mode
-  (`msedge --app=...`) as a quick first step.
-- **Respect Teams mute.** Teams mute doesn't mute the microphone device, so Notarius still hears
-  you while you're muted. Read Teams' mute state (for example through the Teams third-party app
-  API) and leave muted stretches out of your transcript.
-- **Google Meet** (Chrome and Edge). Detect a Meet call from the browser's microphone and audio
-  streams plus the Meet tab title; a small browser extension is the most reliable option.
-- **Teams on the web and Zoom**, detected the same way.
-- **Screen-share screenshots.** While someone shares their screen, save a frame whenever the
-  content changes, such as a new slide. Show the frames next to the transcript, encrypted like
-  the notes, and optionally let the minutes describe what was shown. Off by default.
-- **Meeting titles and attendees** from the Outlook calendar.
+1. **Respect Teams mute (top priority).** Teams mute doesn't switch off the microphone device, so
+   today Notarius still records and transcribes you while you're muted, including private side
+   conversations. Planned flow:
+   - While recording, follow Teams' mute state. The Teams third-party app API, on a local
+     WebSocket that Teams exposes when it's enabled in Teams settings, reports `isMuted` in its
+     meeting updates. Notarius pairs with it once and logs a muted/unmuted timeline next to the
+     audio.
+   - When processing, words on your mic that fall inside a muted stretch are left out of the
+     transcript, the minutes and your talk time, the same way echo is removed today. The call
+     audio from everyone else is unaffected.
+   - If Teams' API isn't available, fall back to today's behaviour, and tell you so on the
+     meeting page, so nothing is silently lost.
+2. **Its own app window instead of a browser tab.** Opening Notarius shows the dashboard in a
+   window with the Notarius icon and its own taskbar entry, like any Windows app. Options: a native
+   window with the built-in Edge WebView2 (for example pywebview), or Edge's app mode
+   (`msedge --app=...`) as a quick first step.
+3. **Google Meet** (Chrome and Edge). Detect a Meet call from the browser's microphone and audio
+   streams plus the Meet tab title; a small browser extension is the most reliable option.
+4. **Teams on the web and Zoom**, detected the same way.
+5. **Screen-share screenshots.** While someone shares their screen, save a frame whenever the
+   content changes, such as a new slide. Show the frames next to the transcript, encrypted like
+   the notes, and optionally let the minutes describe what was shown. Off by default.
+6. **Meeting titles and attendees** from the Outlook calendar.
 
 ## Later
 
