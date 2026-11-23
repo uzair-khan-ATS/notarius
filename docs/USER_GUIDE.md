@@ -84,7 +84,7 @@ You don't need to do anything. Keep Notarius running; it starts with Windows.
 | Purple | Watching for Teams calls |
 | Red | Recording a call |
 | Amber | Writing minutes |
-| Grey | Paused: not taking notes |
+| Grey | Paused: not recording, minutes on hold |
 
 The icon is a speech bubble (the conversation) whose tail is a pen nib writing it down, with a Roman
 letter N inside. The pen is the scribe's, the *notarius* the app is named after.
@@ -97,7 +97,8 @@ visible.
   - **Open Notarius**;
   - **Open in browser**, the same dashboard in your browser at http://127.0.0.1:8765;
   - the current status;
-  - **Pause note-taking**, which stops and discards a call that's being recorded;
+  - **Pause**, which stops recording calls and holds minutes that are being written (Resume carries
+    on where they stopped). A call that's being recorded is stopped and discarded;
   - **Quit Notarius**.
 
 **When you join a call**, recording starts within about 10 seconds, whether you're muted or not.
@@ -109,9 +110,23 @@ get a **Minutes ready** notification:
 | Call length | Minutes ready after you leave (with an NVIDIA GPU) |
 |---|---|
 | 2 minutes | about 45 seconds |
-| 1 hour | about 2-3 minutes; speaker names follow a few minutes later |
+| 1 hour | about 10 minutes; speaker names follow later (about half an hour, longer on battery) |
 
 Calls shorter than a minute, such as a mic test, are discarded.
+
+**While it works**, the meeting page says what it's doing (transcribing, writing the minutes,
+telling the voices apart with a percentage, adding names) and has a **Pause** button. Nothing is
+lost if processing is cut short:
+
+- **Pause** (meeting page, sidebar or tray) holds the work exactly where it is; **Resume** carries
+  on from that point.
+- **Closing the laptop** (sleep) freezes the work; it carries on by itself when you open it again.
+- **Shutting down, restarting or quitting Notarius** stops it. The meeting then shows **Stopped**
+  with a **Resume** button. If the transcription was finished, Resume skips it and goes straight
+  to the speakers.
+
+The audio is kept until the meeting is completely processed (minutes and speaker names). If
+something fails, it stays so you can click **Try again**.
 
 > Let people know you're taking notes, and follow your organization's policy on recording calls.
 
@@ -125,7 +140,8 @@ your PIN.
 - **Search** (or **Ctrl+K** anywhere) finds any word across all minutes, transcripts and your
   notes. Use the arrow keys and Enter to open a result.
 - **Status:** green while it listens for Teams, red with a timer while it records, amber while it
-  writes the minutes. **Pause** sits right next to it and does the same as in the tray.
+  writes the minutes (with what it's doing). **Pause** sits right next to it and does the same as in
+  the tray.
 - **Meetings** and **Action items**, the two pages. The counts show new minutes and open items.
 - **Calendar:** dots mark days with meetings. Click a day, or **drag across days** to pick a range;
   **Show all** clears it.
@@ -207,7 +223,7 @@ remembered voices.
 
 **What stays on your laptop:**
 
-- the audio, which is deleted once the meeting is processed;
+- the audio, which is deleted once the meeting is completely processed;
 - the transcription and speaker separation, which run locally;
 - the transcripts and minutes;
 - the voice fingerprints;
@@ -238,8 +254,9 @@ Recording is never affected.
 
 - A 4-digit PIN stops casual access. Someone already signed in to *your* unlocked Windows account
   could, with effort, guess it offline. Lock Windows (Win+L) when you step away.
-- During a call, and until it's processed, the raw audio is on disk unencrypted. It's deleted
-  afterwards.
+- During a call, and until it's completely processed, the raw audio is on disk unencrypted. It's
+  deleted afterwards. A meeting whose processing stopped or failed keeps its audio until you
+  resume it or try again.
 - Exported Word and PDF files are ordinary, unencrypted files.
 
 **Forgot your PIN?** On the lock screen click **Forgot your PIN?**, enter your recovery key, and
@@ -254,6 +271,8 @@ working. Without the PIN or the recovery key, the notes can't be recovered.
 | Everyone else shows as "Others" | Speaker separation failed or was skipped. The minutes are still written. Check the log (below). |
 | "Minutes failed" | Usually Claude Code isn't logged in. Run `claude` once in a terminal to log in, then click **Try again** on the meeting. |
 | Transcription is slow | Notarius falls back to the CPU when the GPU isn't usable. Check the log for `on cpu`. |
+| A meeting says **Stopped** | Its processing was cut short (shutdown, restart, or Notarius was closed). Open it and click **Resume**; the audio was kept. |
+| "Adding speakers" takes long | Telling the voices apart runs on the CPU, at about half the call's length, longer on battery. The meeting page shows the percentage. The minutes are already readable meanwhile. |
 | The dashboard doesn't open | Make sure Notarius is running (tray icon). Start it from the Start menu, then open http://127.0.0.1:8765. |
 | "Too many attempts" | After 5 wrong PINs the lock screen pauses, starting at 15 seconds and doubling each time. |
 | Windows blocked Notarius.exe | That's Smart App Control; use install option A. |

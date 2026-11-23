@@ -58,7 +58,8 @@ where you choose your PIN and save your recovery key. After that it works by its
 
 **Quit** by right-clicking the tray icon (under **^** next to the clock) and choosing **Quit
 Notarius**. The tray icon is purple while watching, red while recording, amber while writing
-minutes, and grey when paused.
+minutes, and grey when paused. Pausing also holds minutes being written; Resume carries on where
+they stopped, and a meeting cut short by a shutdown can be resumed from its page.
 
 More documentation:
 

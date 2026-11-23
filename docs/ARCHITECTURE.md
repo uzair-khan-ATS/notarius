@@ -134,7 +134,24 @@ shared clock. This keeps the two tracks aligned in time.
 7. **Minutes first, names later.** If separation isn't done 20 seconds after transcription, the
    minutes are written straight away with the call audio as "Others". They are rewritten with
    speakers when separation finishes. In practice this applies to long meetings, since
-   separation runs at about 1/6 of real time.
+   separation takes about half the call's length (more on battery). It reports its progress
+   (`tmp\<id>.progress.json`), which the meeting page shows as a percentage.
+8. **Resuming, and keeping the audio.** The child records where it is in `meta.json` as `stage`
+   (`transcribing`, `minutes`, `speakers`, `final`). Right after transcription it saves a sealed
+   checkpoint, `transcription.json` (both tracks' cleaned, word-timed text and the Teams data).
+   `stage` is cleared only once the transcript and speakers are final. The audio and the
+   checkpoint are deleted only then, after the child exits cleanly; a failure keeps them for
+   **Try again**.
+   - **Pause** suspends the processing children (not Claude's short request) and Resume lets them
+     go on, so nothing is redone. Sleep freezes them the same way.
+   - **Shutdown, restart or quitting** stops them. At the next start, a meeting left with
+     `processing`, `stage` or `speakers_pending` and its audio is marked `interrupted` ("Stopped"
+     with **Resume**). A processing child that is somehow still running is followed instead.
+   - **Resume** hands the child a plain temporary copy of the checkpoint (it can seal but not
+     open files), so it skips transcription; without the PIN unlocked it transcribes again from the
+     audio. A separation result that finished before the interruption is reused.
+   - The children opt out of Windows power throttling, which otherwise runs windowless processes
+     on efficiency cores on battery.
 
 ## 4. Minutes
 
@@ -168,7 +185,8 @@ Meetings live in `%LOCALAPPDATA%\Notarius\Meetings\<YYYY-MM-DD_HHMMSS>\`:
 | `speakers.json` | speakers, fingerprints, names | encrypted |
 | `my_notes.md` | your notes | encrypted |
 | `actions.json` | which action items are ticked | plain (indexes only) |
-| `mic.wav`, `others.wav` | audio, only until processed | plain, then deleted |
+| `transcription.json` | checkpoint for resuming, only until processed | encrypted, then deleted |
+| `mic.wav`, `others.wav` | audio, only until completely processed | plain, then deleted |
 
 Other files in the `Meetings` folder:
 
@@ -223,10 +241,10 @@ title, your name as author and the Notarius version. The logo is drawn from the 
 |---|---|---|
 | GET | `/api/auth` | is a PIN set, is this page unlocked, is there a recovery key |
 | POST | `/api/auth/setup`, `/login`, `/logout`, `/recover`, `/change`, `/recovery-key` | PIN lifecycle |
-| GET | `/api/status` | watching / recording / processing / paused (no PIN needed) |
+| GET | `/api/status` | watching / recording / processing / paused, and the current step (no PIN needed for the first four) |
 | GET | `/api/meetings`, `/api/meetings/<id>`, `/api/search?q=` | meetings |
 | PUT | `/api/meetings/<id>/my_notes`, `/actions`, `/api/days/<date>`, `/api/settings` | edits |
-| POST | `/api/meetings/<id>/speakers`, `/rewrite`, `/retry`, `/api/pause` | actions |
+| POST | `/api/meetings/<id>/speakers`, `/rewrite`, `/retry` (also resumes), `/api/pause` (also holds processing) | actions |
 | GET | `/api/export.docx?ids=`, `/api/export.pdf?ids=` | exports |
 
 ## 7. Configuration
@@ -303,6 +321,6 @@ RTX 4050 laptop GPU, i5-14500HX:
 |---|---|
 | Transcription (batched, GPU) | ~1.1 min per hour of audio |
 | Language checks | a few seconds per hour |
-| Speaker separation (CPU, parallel) | ~10 min per hour of call audio |
+| Speaker separation (CPU, parallel) | ~30-40 min per hour of call audio (70-min call: 39 min) |
 | Minutes (Claude Haiku) | 10-20 s |
 | 2-minute call, end to end | ~45 s after leaving |

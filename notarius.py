@@ -128,10 +128,14 @@ MIN_MEETING_S = 60     # shorter recordings (mic tests) are discarded
 MAX_MEETING_S = 4 * 3600
 TRACK_FILES = ("mic.wav", "others.wav")
 SENSITIVE_FILES = ("notes.md", "transcript.md", "segments.json", "speakers.json", "my_notes.md", "teams.json",
-                   "notes.english.md", "notes.roman-urdu.md")
+                   "notes.english.md", "notes.roman-urdu.md", "transcription.json")
+# Saved after transcription so an interrupted meeting resumes without transcribing again; deleted,
+# with the audio, once the meeting is completely processed.
+CHECKPOINT_FILE = "transcription.json"
 SESSION_IDLE_S = 5 * 60  # the dashboard locks after 5 minutes without activity
-# Speaker separation runs on the CPU at ~1/6 of real time. If it isn't done this many seconds
-# after transcription, the minutes are written first and updated with names when it finishes.
+# Speaker separation runs on the CPU and takes ~1/2 of real time (longer on battery). If it isn't
+# done this many seconds after transcription, the minutes are written first and updated with names
+# when it finishes.
 QUICK_DIARIZE_WAIT_S = float(os.environ.get("NOTETAKER_DIARIZE_WAIT", "20"))
 SOUTH_ASIAN = {"hi", "ur", "pa", "sd"}  # Whisper labels spoken Hindi/Urdu with any of these
 
@@ -761,8 +765,9 @@ def speaker_models() -> tuple[Path, Path]:
     return seg, emb
 
 
-def diarize(audio, threads: int) -> list[tuple[float, float, str]]:
-    """Who spoke when on the call-audio track: [(start, end, "S1"), ...], S1 = first to speak."""
+def diarize(audio, threads: int, progress: Path | None = None) -> list[tuple[float, float, str]]:
+    """Who spoke when on the call-audio track: [(start, end, "S1"), ...], S1 = first to speak.
+    With `progress`, {"done": n, "total": m} is written there as it goes (for the dashboard)."""
     import sherpa_onnx
 
     seg, emb = speaker_models()
@@ -777,7 +782,19 @@ def diarize(audio, threads: int) -> list[tuple[float, float, str]]:
     )
     if not cfg.validate():
         raise RuntimeError("speaker model configuration is invalid")
-    result = sherpa_onnx.OfflineSpeakerDiarization(cfg).process(audio).sort_by_start_time()
+    last = [-1]
+
+    def report(done: int, total: int) -> int:
+        pct = int(100 * done / total) if total else 0
+        if progress is not None and pct != last[0]:
+            last[0] = pct
+            try:
+                write_json(progress, {"done": int(done), "total": int(total)})
+            except OSError:
+                pass
+        return 0  # non-zero would abort
+
+    result = sherpa_onnx.OfflineSpeakerDiarization(cfg).process(audio, callback=report).sort_by_start_time()
     order: dict[int, str] = {}
     return [(r.start, r.end, order.setdefault(r.speaker, f"S{len(order) + 1}")) for r in result]
 
@@ -1282,14 +1299,46 @@ def _diarization_out(meeting_dir: Path) -> Path:
     return APP_DIR / "tmp" / f"{meeting_dir.name}.speakers.json"
 
 
+def _progress_out(out: Path) -> Path:
+    """Where separation reports its progress, next to its result file."""
+    return out.with_name(out.name.replace(".speakers.json", ".progress.json"))
+
+
+def separation_progress(meeting_dir: Path) -> int | None:
+    p = read_json(_progress_out(_diarization_out(meeting_dir)), None)
+    try:
+        return min(99, int(100 * p["done"] / p["total"])) if p and p["total"] else None
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+class _PowerThrottling(ctypes.Structure):
+    _fields_ = [("Version", ctypes.c_ulong), ("ControlMask", ctypes.c_ulong), ("StateMask", ctypes.c_ulong)]
+
+
+def no_power_throttling() -> None:
+    """Opt this process out of Windows power throttling (EcoQoS). On battery Windows otherwise runs
+    windowless background processes on slow efficiency cores, which stretches a long call's
+    speaker separation to well over an hour."""
+    try:
+        k32 = ctypes.WinDLL("kernel32")
+        k32.GetCurrentProcess.restype = ctypes.c_void_p
+        state = _PowerThrottling(1, 1, 0)  # current version, control EXECUTION_SPEED, state: off
+        k32.SetProcessInformation(ctypes.c_void_p(k32.GetCurrentProcess()), 4,  # ProcessPowerThrottling
+                                  ctypes.byref(state), ctypes.sizeof(state))
+    except Exception:
+        pass
+
+
 def run_diarization(wav: Path, out: Path) -> None:
     """Child-process entry: who spoke when + voice fingerprints, written to `out` (deleted after use)."""
     import psutil
     from faster_whisper.audio import decode_audio
 
+    no_power_throttling()
     threads = psutil.cpu_count(logical=False) or 4
     audio = decode_audio(str(wav), sampling_rate=16000)
-    turns = diarize(audio, threads)
+    turns = diarize(audio, threads, _progress_out(out))
     speakers = speaker_profiles(audio, turns, threads)
     before = len(speakers)
     turns, speakers = merge_speakers(turns, speakers)
@@ -1298,32 +1347,48 @@ def run_diarization(wav: Path, out: Path) -> None:
     write_json(out, {"turns": turns, "speakers": speakers})
 
 
+class _AlreadySeparated:
+    """Stands in for the separation process when its result survived an interruption."""
+
+    def wait(self, timeout=None) -> int:
+        return 0
+
+    def kill(self) -> None:
+        pass
+
+
 def _start_diarization(meeting_dir: Path):
     others = meeting_dir / "others.wav"
     if not _usable(others):
         return None
     out = _diarization_out(meeting_dir)
+    if read_json(out, None) is not None:
+        log("speaker separation had already finished; reusing it")
+        return _AlreadySeparated()
     out.unlink(missing_ok=True)
+    _progress_out(out).unlink(missing_ok=True)
     out.parent.mkdir(parents=True, exist_ok=True)
     log("separating speakers (in parallel)")
     return subprocess.Popen([sys.executable, __file__, "_diarize", str(others), str(out)],
                             creationflags=subprocess.CREATE_NO_WINDOW)
 
 
-def _diarization_result(proc, meeting_dir: Path, timeout: float):
-    """(done, result): result is None if separation failed or there was nothing to separate."""
+def _diarization_result(proc, meeting_dir: Path, timeout: float | None):
+    """(done, result, failed): result is None when there was nothing to separate or separation failed."""
     if proc is None:
-        return True, None
+        return True, None, False
     try:
         code = proc.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
-        return False, None
+        return False, None, False
     out = _diarization_out(meeting_dir)
     result = read_json(out, None) if code == 0 else None
     out.unlink(missing_ok=True)
+    _progress_out(out).unlink(missing_ok=True)
     if result is None:
-        log(f"speaker separation failed (exit {code}); the call audio stays under 'Others'")
-    return True, result
+        log(f"speaker separation failed (exit {code})")
+        return True, None, True
+    return True, result, False
 
 
 # --------------------------------------------------------------------------- Teams integration
@@ -1775,123 +1840,234 @@ def write_notes(meeting_dir: Path, transcript: str | None = None, speakers: dict
     return True
 
 
+def _transcribe_tracks(meeting_dir: Path, device: str) -> tuple[list[dict], list[dict], dict | None]:
+    """Both tracks transcribed and cleaned (echo, muted stretches, captioned speech of others)."""
+    from faster_whisper.audio import decode_audio
+
+    t0 = time.monotonic()
+    tr = Transcriber(device)
+    mine: list[dict] = []
+    call: list[dict] = []
+    mic_audio = call_audio = None
+    if _usable(meeting_dir / "mic.wav"):
+        log(f"transcribing your mic ({WHISPER_MODEL} on {device})")
+        mic_audio = decode_audio(str(meeting_dir / "mic.wav"), sampling_rate=16000)
+        mine = tr.track(mic_audio, words=True)
+    if _usable(meeting_dir / "others.wav"):
+        log(f"transcribing the call audio ({WHISPER_MODEL} on {device})")
+        call_audio = decode_audio(str(meeting_dir / "others.wav"), sampling_rate=16000)
+        call = tr.track(call_audio, words=True)
+    heard = sum(len(s["words"]) for s in mine)
+    mine, echoed = remove_echo(mine, call)
+    if echoed:
+        log(f"  removed {echoed} of {heard} words from your mic that matched the call audio (echo)")
+    if mic_audio is not None:
+        mine, leaked = remove_acoustic_echo(mine, mic_audio, call_audio)
+        if leaked:
+            log(f"  removed {leaked} mic sentence(s) whose sound was the call audio leaking in")
+        del mic_audio, call_audio
+    handoff = _teams_handoff(meeting_dir)
+    teams = read_json(handoff, None)
+    handoff.unlink(missing_ok=True)
+    if teams:
+        end = max([x["end"] for x in mine + call] or [0.0]) + 60
+        mine, muted = drop_muted(mine, muted_intervals(teams, end))
+        if muted:
+            log(f"  removed {muted} mic word(s) spoken while Teams had you muted")
+        caps = teams.get("captions") or []
+        _caption_tokens(caps)
+        if caps:
+            teams["me"] = my_caption_name(mine, call, caps)
+            mine, cap_echo = remove_caption_echo(mine, caps, teams["me"])
+            if cap_echo:
+                log(f"  removed {cap_echo} mic word(s) that were someone else's captioned speech")
+        for c in caps:
+            c.pop("_tok", None)  # sets aren't JSON; rebuilt where needed
+    del tr  # free the GPU
+    log(f"transcribed in {time.monotonic() - t0:.0f}s")
+    return mine, call, teams
+
+
+def _caption_tokens(caps: list[dict]) -> None:
+    for c in caps:
+        c["_tok"] = set(_norm_text(c["text"]).split())
+
+
+def _resume_handoff(meeting_dir: Path) -> Path:
+    """A plain, temporary copy of the transcription checkpoint for the processing child, which has no
+    key to decrypt it; the child deletes it on reading."""
+    return APP_DIR / "tmp" / f"{meeting_dir.name}.transcription.json"
+
+
 def _transcribe_and_write(meeting_dir: Path, device: str) -> None:
     """Child-process entry. The transcript stays in this process's memory and is never read
     back from disk, so it works while the (encrypted) notes are locked.
 
     Speaker separation runs alongside transcription in its own process. Short meetings get
     one set of minutes with speakers; for long ones the minutes come first (call audio as
-    "Others") and are rewritten with speakers once separation finishes."""
-    from faster_whisper.audio import decode_audio
+    "Others") and are rewritten with speakers once separation finishes.
 
+    Progress is kept in meta.json as `stage` (transcribing, minutes, speakers, final), cleared only
+    once the transcript and speakers are final, which is when the audio may be deleted. After
+    transcription a sealed checkpoint is saved, so a resumed meeting skips straight to the speakers."""
+    no_power_throttling()
     t0 = time.monotonic()
+    handoff = _resume_handoff(meeting_dir)
+    saved = read_json(handoff, None)
+    handoff.unlink(missing_ok=True)
+    have_minutes = has_file(meeting_dir / "notes.md")
     diar = _start_diarization(meeting_dir)
     try:
-        tr = Transcriber(device)
-        mine: list[dict] = []
-        call: list[dict] = []
-        mic_audio = call_audio = None
-        if _usable(meeting_dir / "mic.wav"):
-            log(f"transcribing your mic ({WHISPER_MODEL} on {device})")
-            mic_audio = decode_audio(str(meeting_dir / "mic.wav"), sampling_rate=16000)
-            mine = tr.track(mic_audio, words=True)
-        if _usable(meeting_dir / "others.wav"):
-            log(f"transcribing the call audio ({WHISPER_MODEL} on {device})")
-            call_audio = decode_audio(str(meeting_dir / "others.wav"), sampling_rate=16000)
-            call = tr.track(call_audio, words=True)
-        heard = sum(len(s["words"]) for s in mine)
-        mine, echoed = remove_echo(mine, call)
-        if echoed:
-            log(f"  removed {echoed} of {heard} words from your mic that matched the call audio (echo)")
-        if mic_audio is not None:
-            mine, leaked = remove_acoustic_echo(mine, mic_audio, call_audio)
-            if leaked:
-                log(f"  removed {leaked} mic sentence(s) whose sound was the call audio leaking in")
-            del mic_audio, call_audio
-        handoff = _teams_handoff(meeting_dir)
-        teams = read_json(handoff, None)
-        handoff.unlink(missing_ok=True)
-        if teams:
-            end = max([x["end"] for x in mine + call] or [0.0]) + 60
-            mine, muted = drop_muted(mine, muted_intervals(teams, end))
-            if muted:
-                log(f"  removed {muted} mic word(s) spoken while Teams had you muted")
-            caps = teams.get("captions") or []
-            for c in caps:
-                c["_tok"] = set(_norm_text(c["text"]).split())
-            if caps:
-                teams["me"] = my_caption_name(mine, call, caps)
-                mine, cap_echo = remove_caption_echo(mine, caps, teams["me"])
-                if cap_echo:
-                    log(f"  removed {cap_echo} mic word(s) that were someone else's captioned speech")
-        del tr  # free the GPU before the (CPU) wait below
-        log(f"transcribed in {time.monotonic() - t0:.0f}s")
+        if saved:
+            mine, call, teams = saved["mine"], saved["call"], saved.get("teams")
+            _teams_handoff(meeting_dir).unlink(missing_ok=True)  # already applied before the checkpoint
+            log("resuming: the transcription was already done")
+        else:
+            update_meta(meeting_dir, stage="transcribing")
+            mine, call, teams = _transcribe_tracks(meeting_dir, device)
+            save_json(meeting_dir / CHECKPOINT_FILE, {"mine": mine, "call": call, "teams": teams})
     except BaseException:
         if diar is not None:
             diar.kill()
         raise
+    _caption_tokens((teams or {}).get("captions") or [])
 
-    done, result = _diarization_result(diar, meeting_dir, QUICK_DIARIZE_WAIT_S)
+    done, result, failed = _diarization_result(diar, meeting_dir, QUICK_DIARIZE_WAIT_S)
     if not done:
-        log("minutes first; speakers will be added when separation finishes")
-        transcript, speakers = _assemble(meeting_dir, mine, call, None, teams)
-        update_meta(meeting_dir, speakers_pending=True)
-        if not write_notes(meeting_dir, transcript, speakers):
-            update_meta(meeting_dir, error="minutes failed (the transcript is available)")
-        done, result = _diarization_result(diar, meeting_dir, 3 * 3600)
-        if not result:
-            update_meta(meeting_dir, speakers_pending=None)
-            return
+        if not have_minutes:
+            log("minutes first; speakers will be added when separation finishes")
+            update_meta(meeting_dir, stage="minutes", speakers_pending=True)
+            transcript, speakers = _assemble(meeting_dir, mine, call, None, teams)
+            if not write_notes(meeting_dir, transcript, speakers):
+                update_meta(meeting_dir, error="minutes failed (the transcript is available)")
+        update_meta(meeting_dir, stage="speakers", speakers_pending=True)
+        done, result, failed = _diarization_result(diar, meeting_dir, None)  # as long as it takes
+    if failed:
+        # Keep the stage, so the audio stays and "Try again" redoes only the speakers.
+        if not has_file(meeting_dir / "notes.md"):
+            transcript, speakers = _assemble(meeting_dir, mine, call, None, teams)
+            write_notes(meeting_dir, transcript, speakers)
+        update_meta(meeting_dir, error="Couldn't tell the speakers apart. The audio is kept, so you can try again.")
+        return
+    update_meta(meeting_dir, stage="final")
     transcript, speakers = _assemble(meeting_dir, mine, call, result, teams)
-    if not write_notes(meeting_dir, transcript, speakers) and not has_file(meeting_dir / "notes.md"):
-        update_meta(meeting_dir, error="minutes failed (the transcript is available)")
-    update_meta(meeting_dir, speakers_pending=None)
+    # Transcript and speakers are final: from here on the minutes can be rewritten without the audio.
+    update_meta(meeting_dir, stage=None, speakers_pending=None)
+    if not write_notes(meeting_dir, transcript, speakers):
+        update_meta(meeting_dir, error=("Couldn't add the speaker names to the minutes." if has_file(meeting_dir / "notes.md")
+                                        else "minutes failed (the transcript is available)"))
     log(f"meeting processed in {time.monotonic() - t0:.0f}s")
 
 
-def process(meeting_dir: Path, device: str | None = None) -> bool:
+# Processing children by meeting id (their psutil.Process), so Pause can hold them and Resume
+# can let them carry on exactly where they were.
+_WORKERS: dict[str, object] = {}
+_workers_lock = threading.Lock()
+
+
+def _unfinished(meeting_dir: Path) -> bool:
+    """Transcript and speakers aren't final yet (so the audio is still needed)."""
+    meta = read_json(meeting_dir / "meta.json", {})
+    return bool(meta.get("stage") or meta.get("speakers_pending")) or not has_file(meeting_dir / "segments.json")
+
+
+def _prepare_handoffs(meeting_dir: Path) -> None:
+    """Plain temporary copies of the sealed files the child needs: it can seal but not open them."""
+    for name, handoff in (("teams.json", _teams_handoff(meeting_dir)), (CHECKPOINT_FILE, _resume_handoff(meeting_dir))):
+        if handoff.exists():
+            continue
+        try:
+            if (data := load_json(meeting_dir / name, None)):
+                write_json(handoff, data)
+        except Locked:
+            if name == CHECKPOINT_FILE:
+                log("checkpoint locked (dashboard not unlocked); transcribing again")
+
+
+def _run_worker(meeting_dir: Path, device: str | None, adopt=None) -> bool:
+    """Run (or, with `adopt`, keep watching) the processing child; delete the audio only once
+    everything is done."""
+    import psutil
+
+    notified = False
+    ok_exit = False
+    for dev in [None] if adopt else [device] if device else ["cuda", "cpu"]:
+        if adopt:
+            proc = adopt
+        else:
+            _prepare_handoffs(meeting_dir)
+            # Separate process: a missing CUDA/cuDNN DLL can abort the interpreter outright.
+            child = subprocess.Popen([sys.executable, __file__, "_transcribe", str(meeting_dir), "--device", dev],
+                                     creationflags=0 if console_visible() else subprocess.CREATE_NO_WINDOW)
+            try:
+                proc = psutil.Process(child.pid)
+            except psutil.Error:
+                proc = None
+        with _workers_lock:
+            if proc is not None:
+                _WORKERS[meeting_dir.name] = proc
+        try:
+            while True:
+                if adopt:
+                    try:
+                        code = proc.wait(timeout=2)
+                        break
+                    except psutil.TimeoutExpired:
+                        pass
+                elif (code := child.poll()) is not None:
+                    break
+                else:
+                    time.sleep(2)
+                if not notified and _on_minutes_ready and has_file(meeting_dir / "notes.md"):
+                    notified = True  # first minutes are out; speakers may still be in progress
+                    _on_minutes_ready(meeting_dir)
+        finally:
+            with _workers_lock:
+                _WORKERS.pop(meeting_dir.name, None)
+        if code == 0 or (adopt and code is None):
+            ok_exit = True
+            break
+        log(f"processing{f' on {dev}' if dev else ''} failed (exit {code})")
+        if read_json(meeting_dir / "meta.json", {}).get("stage") != "transcribing":
+            break  # it got past the GPU work, so the CPU fallback wouldn't help
+    meta = read_json(meeting_dir / "meta.json", {})
+    if not ok_exit:
+        log(f"processing failed; audio kept in {meeting_dir.name}")
+        update_meta(meeting_dir, error=meta.get("error") or "Processing stopped with an error. The audio is kept, so you can try again.")
+        return False
+    if _unfinished(meeting_dir):
+        log(f"processing not finished; audio kept in {meeting_dir.name}")
+        if not meta.get("error"):
+            update_meta(meeting_dir, interrupted=True)
+        return False
+    if not KEEP_AUDIO:
+        for f in TRACK_FILES:
+            (meeting_dir / f).unlink(missing_ok=True)
+    for f in (meeting_dir / CHECKPOINT_FILE, _enc(meeting_dir / CHECKPOINT_FILE)):
+        f.unlink(missing_ok=True)
+    ok = not meta.get("error")
+    if ok and not notified and _on_minutes_ready:
+        _on_minutes_ready(meeting_dir)
+    return ok
+
+
+def process(meeting_dir: Path, device: str | None = None, adopt=None) -> bool:
+    """Process a meeting, or resume one that was interrupted: from the transcription checkpoint
+    when there is one (and it can be opened), else from the audio. `adopt` is a processing child
+    left running by a previous Notarius, to watch until it finishes."""
     with _state_lock:
         STATE["processing"] += 1
-    update_meta(meeting_dir, error=None, processing=True)
+    update_meta(meeting_dir, error=None, processing=True, interrupted=None)
     try:
-        if not has_file(meeting_dir / "segments.json") and any(_usable(meeting_dir / f) for f in TRACK_FILES):
-            notified = False
-            if not _teams_handoff(meeting_dir).exists():
-                try:
-                    if (data := load_json(meeting_dir / "teams.json", None)):
-                        write_json(_teams_handoff(meeting_dir), data)
-                except Locked:
-                    pass
-            for dev in [device] if device else ["cuda", "cpu"]:
-                # Separate process: a missing CUDA/cuDNN DLL can abort the interpreter outright.
-                child = subprocess.Popen([sys.executable, __file__, "_transcribe", str(meeting_dir), "--device", dev],
-                                         creationflags=0 if console_visible() else subprocess.CREATE_NO_WINDOW)
-                while child.poll() is None:
-                    time.sleep(2)
-                    if not notified and _on_minutes_ready and has_file(meeting_dir / "notes.md"):
-                        notified = True  # first minutes are out; speakers may still be in progress
-                        _on_minutes_ready(meeting_dir)
-                if child.returncode == 0:
-                    break
-                log(f"transcription on {dev} failed (exit {child.returncode})")
-            else:
-                log(f"transcription failed; audio kept in {meeting_dir.name}")
-                update_meta(meeting_dir, error="transcription failed")
-                return False
-            if not KEEP_AUDIO:
-                for f in TRACK_FILES:
-                    (meeting_dir / f).unlink(missing_ok=True)
-            ok = not read_json(meeting_dir / "meta.json", {}).get("error")
-            if ok and not notified and _on_minutes_ready:
-                _on_minutes_ready(meeting_dir)
-        elif has_file(meeting_dir / "transcript.md"):
+        if adopt is not None or (any(_usable(meeting_dir / f) for f in TRACK_FILES) and _unfinished(meeting_dir)):
+            return _run_worker(meeting_dir, device, adopt)
+        if has_file(meeting_dir / "transcript.md"):
             ok = write_notes(meeting_dir)  # rewrite only: needs the dashboard unlocked
             if not ok:
                 update_meta(meeting_dir, error="minutes failed (the transcript is available)")
-        else:
-            update_meta(meeting_dir, error="no audio was recorded")
-            return False
-        return ok
+            return ok
+        update_meta(meeting_dir, error="no audio was recorded")
+        return False
     except Locked:
         update_meta(meeting_dir, error="unlock the dashboard to rewrite these minutes")
         return False
@@ -1899,6 +2075,90 @@ def process(meeting_dir: Path, device: str | None = None) -> bool:
         update_meta(meeting_dir, processing=None, rewriting=None)
         with _state_lock:
             STATE["processing"] -= 1
+
+
+def _worker_processes() -> list:
+    """The processing children and their descendants, except Claude (its short request may finish)."""
+    import psutil
+
+    with _workers_lock:
+        roots = list(_WORKERS.values())
+    procs = []
+    for p in roots:
+        try:
+            procs += [p, *p.children(recursive=True)]
+        except psutil.Error:
+            pass
+    out = []
+    for p in procs:
+        try:
+            if p.name().lower() != "claude.exe":
+                out.append(p)
+        except psutil.Error:
+            pass
+    return out
+
+
+def set_paused(paused: bool) -> None:
+    """Pause: stop recording new calls and hold the minutes being written (the processes are
+    suspended, so Resume carries on exactly where they stopped; the audio stays until done)."""
+    import psutil
+
+    with _state_lock:
+        if STATE["paused"] == paused:
+            return
+        STATE["paused"] = paused
+    held = 0
+    for p in _worker_processes():
+        try:
+            p.suspend() if paused else p.resume()
+            held += 1
+        except psutil.Error:
+            pass
+    work = f" ({'holding' if paused else 'continuing'} {held} processing step(s))" if held else ""
+    log(("note-taking paused" if paused else "note-taking resumed") + work)
+
+
+def recover_unfinished() -> None:
+    """At startup: keep watching processing a previous Notarius left running, and mark meetings
+    whose processing was cut short (shutdown, restart, crash) so they can be resumed from the
+    meeting page. Nothing is deleted."""
+    import psutil
+
+    found: dict[int, tuple[str, object]] = {}
+    for p in psutil.process_iter(["cmdline"]):
+        cl = p.info.get("cmdline") or []
+        if "_transcribe" in cl and any(c.lower().endswith("notarius.py") for c in cl):
+            i = cl.index("_transcribe")
+            if i + 1 < len(cl):
+                found[p.pid] = (Path(cl[i + 1]).name, p)
+    live = {}
+    for pid, (mid, p) in found.items():  # the venv launcher and the real interpreter both match
+        try:
+            if p.ppid() not in found:
+                live[mid] = p
+        except psutil.Error:
+            pass
+    if not NOTES_ROOT.exists():
+        return
+    for d in NOTES_ROOT.iterdir():
+        if not _MEETING_ID.fullmatch(d.name):
+            continue
+        meta = read_json(d / "meta.json", None)
+        if not meta or meta.get("duration_s") is None:
+            continue
+        if d.name in live:
+            log(f"{d.name}: processing still running from before; following it")
+            threading.Thread(target=process, args=(d,), kwargs={"adopt": live[d.name]}, daemon=False).start()
+            continue
+        _resume_handoff(d).unlink(missing_ok=True)
+        if not (meta.get("processing") or meta.get("stage") or meta.get("speakers_pending")):
+            continue
+        if any(_usable(d / f) for f in TRACK_FILES) and _unfinished(d):
+            log(f"{d.name}: processing was interrupted; audio kept, it can be resumed")
+            update_meta(d, processing=None, rewriting=None, interrupted=True)
+        else:
+            update_meta(d, processing=None, rewriting=None, stage=None, speakers_pending=None)
 
 
 def finish(rec: Recording, discard: bool = False) -> None:
@@ -1948,6 +2208,8 @@ def meeting_summary(d: Path) -> dict | None:
     summary = next((ln.split(":**", 1)[-1].strip() for ln in lines if ln.startswith("**Summary:**")), None)
     if dur is None:
         status = "recording"
+    elif meta.get("interrupted") and not meta.get("processing"):
+        status = "interrupted"
     elif meta.get("processing") and not (notes and meta.get("speakers_pending")):
         status = "processing"
     elif notes and not meta.get("error"):
@@ -1967,10 +2229,22 @@ def meeting_summary(d: Path) -> dict | None:
         "duration_min": max(1, round(dur / 60)) if dur else None, "title": title, "summary": summary,
         "status": status, "error": meta.get("error"), "language": minutes_language(d),
         "speakers_pending": bool(meta.get("speakers_pending")), "rewriting": meta.get("rewriting"),
+        **work_state(d, meta),
         "has_my_notes": bool((load_text(d / "my_notes.md") or "").strip()),
         "actions": actions, "topics": topics, "people": people,
         "unnamed_speakers": sum(1 for sp in speakers.values() if not sp.get("name")),
     }
+
+
+def work_state(d: Path, meta: dict) -> dict:
+    """Where processing is (no meeting content): for the meeting page and the status card."""
+    with _workers_lock:
+        running = d.name in _WORKERS
+    with _state_lock:
+        held = running and STATE["paused"]
+    stage = meta.get("stage")
+    return {"working": bool(meta.get("processing")), "stage": stage, "held": held,
+            "progress": separation_progress(d) if stage == "speakers" else None}
 
 
 def list_meetings() -> list[dict]:
@@ -2601,8 +2875,14 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _get(self, api: list[str], q: dict) -> None:
         if api == ["status"]:
+            with _workers_lock:
+                ids = list(_WORKERS)
+            task = None
+            for mid in ids:
+                d = NOTES_ROOT / mid
+                task = {"id": mid, **work_state(d, read_json(d / "meta.json", {}))}
             with _state_lock:
-                return self._send(200, {**STATE, "my_name": my_name()})
+                return self._send(200, {**STATE, "my_name": my_name(), "task": task})
         if api == ["settings"]:
             s = settings()
             voices = sorted(read_voices())
@@ -2691,21 +2971,20 @@ class _Handler(BaseHTTPRequestHandler):
             log("remembered voices forgotten")
             return self._send(200, {"ok": True})
         if api == ["pause"]:
-            with _state_lock:
-                STATE["paused"] = bool(self._json_body().get("paused"))
-            log("note-taking paused" if STATE["paused"] else "note-taking resumed")
+            set_paused(bool(self._json_body().get("paused")))
             return self._send(200, {"paused": STATE["paused"]})
         if len(api) != 3 or api[0] != "meetings" or not (d := self._meeting_dir(api[1])):
             return self._send(404, {"error": "not found"})
-        status = meeting_summary(d)["status"]
-        busy = status in ("recording", "processing")
-        if api[2] == "retry":
-            if status != "failed":
-                return self._send(409, {"error": "only a failed meeting can be retried"})
+        summary = meeting_summary(d)
+        status = summary["status"]
+        busy = status in ("recording", "processing") or summary["working"]
+        if api[2] in ("retry", "resume"):
+            if busy or status not in ("failed", "interrupted"):
+                return self._send(409, {"error": "Only a stopped or failed meeting can be resumed."})
             self._reprocess(d)
             return self._send(202, {"ok": True})
         if api[2] == "speakers":
-            if busy:
+            if busy or status == "interrupted":
                 return self._send(409, {"error": "Wait until the minutes are written."})
             names = self._json_body()
             if rename_speakers(d, {str(k): str(v) for k, v in names.items()}) and has_file(d / "notes.md"):
@@ -2714,7 +2993,7 @@ class _Handler(BaseHTTPRequestHandler):
             return self._send(202, {"ok": True})
         if api[2] == "rewrite":
             lang = self._json_body().get("language")
-            if busy or lang not in MINUTES_LANGUAGES:
+            if busy or status == "interrupted" or lang not in MINUTES_LANGUAGES:
                 return self._send(409, {"error": "These minutes can't be rewritten right now."})
             current = minutes_language(d)
             if lang == current:
@@ -3114,6 +3393,7 @@ def cmd_watch() -> None:
     if not _claim_single_instance():
         log(f"{APP_NAME} is already running (dashboard: {DASHBOARD_URL})")
         return
+    recover_unfinished()
     start_dashboard(block=False)
     set_title("notetaker - idle")
     stop = threading.Event()
@@ -3195,8 +3475,8 @@ def logo_svg(color: str = LOGO_PURPLE) -> str:
             f'<rect x="4" y="4" width="56" height="56" rx="14" fill="{color}"/>'
             f'<rect x="{x0}" y="{y0}" width="{x1 - x0}" height="{y1 - y0}" rx="{r}" fill="#fff"/>'
             f'<polygon points="{pts(outline)}" fill="#fff"/>'
-            f'<path d="M{sx:.2f} {sy:.2f}L{ex:.2f} {ey:.2f}" stroke="{color}" stroke-width="1.4" stroke-linecap="round"/>'
-            f'<circle cx="{hx:.2f}" cy="{hy:.2f}" r="1.7" fill="{color}"/>'
+            f'<path d="M{sx:.2f} {sy:.2f}L{ex:.2f} {ey:.2f}" stroke="{color}" stroke-width="{LOGO_NIB_SLIT}"/>'
+            f'<circle cx="{hx:.2f}" cy="{hy:.2f}" r="{LOGO_NIB_HOLE}" fill="{color}"/>'
             f'<g fill="{color}">{n}</g></svg>')
 
 
@@ -3224,7 +3504,7 @@ def cmd_tray(open_window: bool) -> None:
     def status_text() -> str:
         with _state_lock:
             if STATE["paused"]:
-                return "Paused: not taking notes"
+                return "Paused: not recording" + (", minutes on hold" if STATE["processing"] else "")
             if STATE["recording"]:
                 return f"Recording Teams call (since {STATE['since'][11:16]})"
             if STATE["processing"]:
@@ -3238,9 +3518,7 @@ def cmd_tray(open_window: bool) -> None:
             return "recording" if STATE["recording"] else "processing" if STATE["processing"] else "idle"
 
     def toggle_pause(_icon, _item) -> None:
-        with _state_lock:
-            STATE["paused"] = not STATE["paused"]
-        log("note-taking paused" if STATE["paused"] else "note-taking resumed")
+        set_paused(not STATE["paused"])
 
     def quit_app(ic=None, _item=None) -> None:
         stop.set()
@@ -3254,7 +3532,7 @@ def cmd_tray(open_window: bool) -> None:
             pystray.MenuItem("Open in browser", lambda *_: webbrowser.open(DASHBOARD_URL)),
             pystray.MenuItem(lambda _item: status_text(), None, enabled=False),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Pause note-taking", toggle_pause, checked=lambda _item: STATE["paused"]),
+            pystray.MenuItem("Pause (no recording, minutes on hold)", toggle_pause, checked=lambda _item: STATE["paused"]),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(f"Quit {APP_NAME}", quit_app),
         ),
@@ -3297,6 +3575,7 @@ def cmd_tray(open_window: bool) -> None:
         quit_app()
 
     NOTES_ROOT.mkdir(parents=True, exist_ok=True)
+    recover_unfinished()
     start_dashboard(block=False)
     watcher = threading.Thread(target=watch_loop, args=(stop,), daemon=True)
     watcher.start()
@@ -3306,6 +3585,7 @@ def cmd_tray(open_window: bool) -> None:
         show_window()
     icon.run()
     stop.set()
+    set_paused(False)  # held processing must not stay suspended once the app is gone
     close_windows()
     watcher.join(timeout=30)  # lets an in-progress recording be saved and handed to processing
     log(f"{APP_NAME} closed")
@@ -3392,9 +3672,9 @@ def cmd_install() -> None:
     import comtypes.client
 
     launcher = _launcher()
-    uvw = shutil.which("uvw") or str(Path(shutil.which("uv") or "uv").with_name("uvw.exe"))
+    uvw = find_uvw()
     script = Path(__file__).resolve()
-    if not launcher and not Path(uvw).exists():
+    if not uvw:
         sys.exit("uvw.exe (part of uv) was not found; install uv from https://docs.astral.sh/uv/")
     ico = save_icon(APP_DIR / "notarius.ico")
     shell = comtypes.client.CreateObject("WScript.Shell", dynamic=True)
@@ -3404,12 +3684,12 @@ def cmd_install() -> None:
     for lnk, mode in links.items():
         lnk.parent.mkdir(parents=True, exist_ok=True)
         s = shell.CreateShortcut(str(lnk))
-        if launcher:
-            s.TargetPath, s.Arguments = str(launcher), mode
-            s.WorkingDirectory, s.IconLocation = str(launcher.parent), f"{launcher},0"
-        else:
-            s.TargetPath, s.Arguments = uvw, f'run --script "{script}" {mode}'
-            s.WorkingDirectory, s.IconLocation = str(script.parent), str(ico)
+        # The shortcuts start Notarius through uvw.exe, which is signed, also when Notarius.exe
+        # installed it: Smart App Control may block an unsigned Notarius.exe on some days, and the
+        # login item must never fail silently. Notarius.exe installs, updates and uninstalls.
+        s.TargetPath, s.Arguments = uvw, f'run --script "{script}" {mode}'
+        s.WorkingDirectory = str(script.parent)
+        s.IconLocation = f"{launcher},0" if launcher else str(ico)
         s.Description = f"{APP_NAME}: minutes of your Teams meetings, taken locally"
         s.Save()
         try:

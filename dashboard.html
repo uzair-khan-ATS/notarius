@@ -530,7 +530,7 @@ body.print .md tr { break-inside: avoid; }
     <button class="sb-search" id="search-btn" type="button"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Search</span><kbd>Ctrl K</kbd></button>
     <div class="status off" id="status-card" role="status" aria-live="polite">
       <span class="st-dot"></span><div class="st-title" id="state-text">Connecting...</div><div class="st-sub" id="state-sub"></div>
-      <button class="st-btn" id="pause" type="button" title="Pause note-taking (a call in progress is stopped and not saved)"><span>Pause</span></button>
+      <button class="st-btn" id="pause" type="button" title="Pause: no new calls are recorded and minutes being written are held until you resume (a call in progress is stopped and not saved)"><span>Pause</span></button>
     </div>
     <nav class="nav" aria-label="Pages">
       <button class="nav-item on" id="nav-meetings" data-page="meetings" type="button">
@@ -823,17 +823,28 @@ function renderStatus() {
   if (!st) { el.classList.add("off"); title.textContent = "Not connected"; sub.textContent = "Is Notarius running?"; pb.hidden = true; return; }
   pb.hidden = false;
   pb.innerHTML = (st.paused ? ICON.play : ICON.pause) + `<span>${st.paused ? "Resume" : "Pause"}</span>`;
-  if (st.paused) { el.classList.add("paused"); title.textContent = "Paused"; sub.textContent = "Calls aren't being recorded"; return; }
+  if (st.paused) { el.classList.add("paused"); title.textContent = "Paused"; sub.textContent = st.processing ? "Minutes on hold, calls not recorded" : "Calls aren't being recorded"; return; }
   if (st.recording) {
     el.classList.add("rec");
     const secs = Math.max(0, Math.round((Date.now() - new Date(st.since).getTime()) / 1000));
     const h = Math.floor(secs / 3600), m = Math.floor(secs / 60) % 60;
     title.textContent = `Recording · ${h ? h + ":" + pad(m) : m}:${pad(secs % 60)}`;
     sub.textContent = "Teams call in progress";
-  } else if (st.processing) { el.classList.add("busy"); title.textContent = "Writing minutes"; sub.textContent = "Ready in a minute or two"; }
+  } else if (st.processing) { el.classList.add("busy"); title.textContent = st.task && st.task.stage === "speakers" ? "Adding speakers" : "Writing minutes"; sub.textContent = st.task ? workText(st.task) : "Working on it"; }
   else if (st.watching) { title.textContent = "Listening for Teams"; sub.textContent = "Recording starts when you join"; }
   else { el.classList.add("off"); title.textContent = "Not recording calls"; sub.textContent = "Open Notarius from the Start menu"; pb.hidden = true; }
 }
+// What processing is doing right now, from the meeting's stage (and separation progress).
+function workText(m) {
+  const pct = m.progress != null ? ` · ${m.progress}%` : "";
+  if (m.stage === "transcribing") return "Transcribing the call";
+  if (m.stage === "speakers") return `Telling the voices apart${pct}`;
+  if (m.stage === "final") return "Adding names to the minutes";
+  if (m.rewriting) return `Writing the minutes in ${m.rewriting}`;
+  return "Writing the minutes";
+}
+const STAGE_DONE = { transcribing: "from the start (the audio is kept)", minutes: "with the minutes (the transcript is done)",
+  speakers: "with telling the voices apart (the transcript is done)", final: "with adding names to the minutes" };
 function renderSidebar() {
   const open = S.meetings.reduce((n, m) => n + m.actions.filter((a) => !a.done).length, 0);
   const fresh = S.meetings.filter(isNew).length, cm = $("#count-meetings");
@@ -954,7 +965,10 @@ function actionRow(m, a, showFrom) {
 }
 function statusBadge(m) {
   if (m.status === "recording") return '<span class="badge rec">Recording</span>';
+  if (m.held) return '<span class="badge">Paused</span>';
   if (m.status === "processing") return '<span class="badge busy"><span class="spin"></span>Writing minutes</span>';
+  if (m.status === "interrupted") return '<span class="badge bad">Stopped</span>';
+  if (m.working && m.speakers_pending) return '<span class="badge busy"><span class="spin"></span>Adding speakers</span>';
   if (m.status === "failed") return '<span class="badge bad">Failed</span>';
   return "";
 }
@@ -993,7 +1007,8 @@ function meetingRow(m) {
     : m.unnamed_speakers ? `<span class="who">${ICON.users}${plural(m.unnamed_speakers, "speaker")}</span>` : "";
   const extra = [m.unnamed_speakers && people.length ? `${plural(m.unnamed_speakers, "unnamed voice")}` : "", m.has_my_notes ? "Your notes" : ""].filter(Boolean).map((x) => `<span>${x}</span>`).join("");
   const title = m.title || (m.status === "ready" ? "Teams meeting" : "Teams call");
-  const sum = m.summary ? inline(esc(m.summary)) : m.status === "processing" ? "Transcribing and writing the minutes..." : m.status === "recording" ? "This call is being recorded right now." : m.status === "failed" ? esc(m.error || "Processing failed") : "";
+  const sum = m.summary ? inline(esc(m.summary)) : m.status === "processing" ? "Transcribing and writing the minutes..." : m.status === "recording" ? "This call is being recorded right now." : m.status === "failed" ? esc(m.error || "Processing failed")
+    : m.status === "interrupted" ? "Processing stopped before it finished. Open the meeting to resume it." : "";
   const fresh = isNew(m);
   const topics = (m.topics || []).slice(0, 3).map((t) => `<span class="topic" title="${esc(t)}">${esc(t.replace(/^Topic \d+:\s*/i, ""))}</span>`).join("");
   return `<button type="button" class="mrow ${fresh ? "unread" : ""}" data-open="${m.id}">
@@ -1082,8 +1097,9 @@ function renderMeeting() {
       ${named.length ? `<span class="mi">${avatarStack(named, 5)}<span class="people-names">${esc(named.slice(0, 4).join(", "))}${named.length > 4 ? ` +${named.length - 4}` : ""}</span></span>` : ""}
       ${unnamed && nameable.length ? `<button type="button" class="linkbtn" data-tab="people">${plural(unnamed, "unnamed voice")}: name them</button>` : ""}</div>`;
   if (m.status === "failed") html += `<div class="banner bad"><span>${esc(m.error || "Processing failed")}</span><button type="button" class="btn sm" id="retry">Try again</button></div>`;
-  if (m.status === "processing") html += `<div class="banner warn"><span class="spin"></span>${m.rewriting ? `Writing the minutes in ${esc(m.rewriting)} from the transcript you already have`
-    : m.transcript ? "Writing the minutes from the transcript" : "Transcribing and writing the minutes"}. This page updates by itself.</div>`;
+  if (m.status === "interrupted") html += `<div class="banner warn"><span>Processing stopped before it finished: Notarius was closed or the PC shut down. Your audio is kept until the minutes are complete. Resume carries on ${STAGE_DONE[m.stage] || "where it stopped"}.</span><button type="button" class="btn sm primary" id="retry">${ICON.play}Resume</button></div>`;
+  if (m.working && m.held) html += `<div class="banner info"><span><b>Paused:</b> ${esc(workText(m))}. Nothing is lost; your audio is kept until it's finished, and Resume carries on from here.</span><button type="button" class="btn sm primary" id="work-resume">${ICON.play}Resume</button></div>`;
+  else if (m.working && (m.status === "processing" || m.speakers_pending)) html += `<div class="banner warn"><span class="spin"></span><span>${esc(workText(m))}${m.notes && m.speakers_pending ? ". The minutes below get speaker names when it's done" : ""}. This page updates by itself.</span><button type="button" class="btn sm" id="work-pause">${ICON.pause}Pause</button></div>`;
   if (m.status === "recording") html += `<div class="banner bad">This call is being recorded right now. The minutes appear a minute or two after you leave.</div>`;
 
   const tabs = [["minutes", ICON.spark + "Summary", ""], ["transcript", ICON.mic + "Transcript", ""], ["actions", ICON.check + "Action items", acts.length ? acts.filter((a) => !a.done).length || "" : ""],
@@ -1165,7 +1181,15 @@ function wireMeeting(m) {
   $("#back").onclick = () => { S.meetingId = null; S.meeting = null; history.replaceState(null, "", location.pathname); renderMain(); };
   $$("#main [data-tab]:not([data-open])").forEach((b) => b.onclick = () => { S.tab = b.dataset.tab; renderMeeting(); });
   const copy = $("#copy"); if (copy) copy.onclick = async () => { await navigator.clipboard.writeText(m.notes); toast("Minutes copied. Paste them into Teams, Outlook or Word."); };
-  const retry = $("#retry"); if (retry) retry.onclick = async () => { await api(`/api/meetings/${m.id}/retry`, { method: "POST" }); toast("Trying again..."); await refreshData(true); };
+  const retry = $("#retry"); if (retry) retry.onclick = async () => {
+    retry.disabled = true;
+    const r = await api(`/api/meetings/${m.id}/retry`, { method: "POST" });
+    toast(r.ok ? (m.status === "interrupted" ? "Resuming..." : "Trying again...") : ((await r.json().catch(() => ({}))).error || "Couldn't resume"));
+    await refreshData(true);
+  };
+  const wp = $("#work-pause"), wr = $("#work-resume");
+  if (wp) wp.onclick = () => setPaused(true);
+  if (wr) wr.onclick = () => setPaused(false);
   $$("[data-lang]").forEach((b) => b.onclick = async () => {
     if (b.classList.contains("on")) return;
     const r = await api(`/api/meetings/${m.id}/rewrite`, { method: "POST", body: JSON.stringify({ language: b.dataset.lang }) });
@@ -1496,12 +1520,14 @@ document.addEventListener("visibilitychange", () => {
 });
 ["pointerdown", "keydown", "wheel", "pointermove"].forEach((ev) => addEventListener(ev, () => { lastActive = Date.now(); }, { passive: true }));
 setInterval(() => { if (SESSION && Date.now() - lastActive > IDLE_MS) lockNow(); }, 10000);
-$("#pause").onclick = async () => {
-  const paused = !(S.status && S.status.paused);
+async function setPaused(paused) {
   if (paused && S.status && S.status.recording && !confirm("Pause now? The call being recorded will be stopped and not saved.")) return;
   const r = await api("/api/pause", { method: "POST", body: JSON.stringify({ paused }) });
-  if (r.ok) { toast(paused ? "Paused. Calls won't be recorded until you resume." : "Resumed. Teams calls will be recorded."); refreshData(false); }
-};
+  const busy = S.status && S.status.processing;
+  if (r.ok) { toast(paused ? (busy ? "Paused. The minutes are on hold and calls won't be recorded until you resume." : "Paused. Calls won't be recorded until you resume.")
+                              : (busy ? "Resumed. The minutes carry on from where they stopped." : "Resumed. Teams calls will be recorded.")); refreshData(true); }
+}
+$("#pause").onclick = () => setPaused(!(S.status && S.status.paused));
 async function loadSettings() { const r = await api("/api/settings"); if (r.ok) S.settings = await r.json(); }
 $("#open-settings").onclick = async () => {
   await loadSettings(); const s = S.settings || {};
