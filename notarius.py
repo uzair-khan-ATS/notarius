@@ -2133,12 +2133,129 @@ def _docx_brand_table(table, rows: list[list[str]], width: int) -> None:
             run.bold, run.font.color.rgb = True, RGBColor(0xFF, 0xFF, 0xFF)
 
 
-def _docx_branding(doc, titles: list[str]) -> None:
-    """Notarius look: logo and name in the header, a footer with page numbers, purple headings,
-    and the file's properties (the template would otherwise say "python-docx", created in 2013)."""
+BRAND_INK, BRAND_PANEL, BRAND_LINE, BRAND_SOFT = "18181B", "F7F7FB", "E4E4EE", "EEF0FF"
+DECISION_FILL, DECISION_INK = "EFFAF2", "15803D"
+
+
+def _docx_shade(props, fill: str) -> None:
+    props.append(_docx_el("w:shd", val="clear", color="auto", fill=fill))
+
+
+def _docx_table_look(table, borders: dict, margin: int = 100) -> None:
+    """Only the given table borders ({side: (eighths of a point, colour)}), and inner cell padding."""
+    pr = table._tbl.tblPr
+    box = _docx_el("w:tblBorders")
+    for side in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        sz, color = borders.get(side, (0, "auto"))
+        box.append(_docx_el(f"w:{side}", val="single" if sz else "nil", sz=sz, space=0, color=color))
+    pr.append(box)
+    mar = _docx_el("w:tblCellMar")
+    for side in ("top", "left", "bottom", "right"):
+        mar.append(_docx_el(f"w:{side}", w=margin if side in ("top", "bottom") else margin + 60, type="dxa"))
+    pr.append(mar)
+
+
+def _docx_spacer(doc, pt: float = 6) -> None:
+    """A thin empty paragraph: keeps two tables from merging and spaces the blocks."""
+    from docx.enum.text import WD_LINE_SPACING
+    from docx.shared import Pt
+
+    f = doc.add_paragraph().paragraph_format
+    f.space_before, f.space_after, f.line_spacing_rule, f.line_spacing = Pt(0), Pt(0), WD_LINE_SPACING.EXACTLY, Pt(pt)
+
+
+def _docx_label(par, text: str, color: str) -> None:
+    from docx.shared import Pt, RGBColor
+
+    r = par.add_run(text.upper())
+    r.font.size, r.font.bold, r.font.color.rgb = Pt(7.5), True, RGBColor.from_string(color)
+    r._r.get_or_add_rPr().append(_docx_el("w:spacing", val=20))
+    par.paragraph_format.space_after = Pt(1)
+
+
+def _docx_masthead(doc, logo: bytes, width: int) -> None:
+    """The top of each meeting: logo, the Notarius name, "Minutes of meeting", a purple rule."""
     import io
 
+    from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
     from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Cm, Pt, RGBColor
+
+    t = doc.add_table(rows=1, cols=2)
+    t.autofit = False
+    _docx_table_look(t, {"bottom": (18, LOGO_PURPLE[1:].upper())}, margin=80)
+    left, right = t.rows[0].cells
+    left.width, right.width = int(width * 0.62), width - int(width * 0.62)
+    for cell in (left, right):
+        cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+    p = left.paragraphs[0]
+    p.add_run().add_picture(io.BytesIO(logo), height=Cm(1.1))
+    name = p.add_run(f"  {APP_NAME}")
+    name.font.size, name.font.bold, name.font.color.rgb = Pt(20), True, RGBColor.from_string(LOGO_PURPLE[1:].upper())
+    name._r.get_or_add_rPr().append(_docx_el("w:position", val=10))  # lift the name to the logo's middle
+    q = right.paragraphs[0]
+    q.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    _docx_label(q, "Minutes of meeting", BRAND_GREY)
+    _docx_spacer(doc, 10)
+
+
+def _docx_meta(doc, rows: list, width: int) -> None:
+    """A light panel, label over value: [[("Date", ...), ("Time", ...)], [("Attendees", ...)]]."""
+    from docx.shared import Pt
+
+    cols = max(len(r) for r in rows)
+    t = doc.add_table(rows=len(rows), cols=cols)
+    t.autofit = False
+    _docx_table_look(t, {s: (4, BRAND_LINE) for s in ("top", "left", "bottom", "right")})
+    for row in t.rows:
+        for cell in row.cells:
+            cell.width = width // cols
+    for r, items in enumerate(rows):
+        if len(items) < cols:
+            t.cell(r, 0).merge(t.cell(r, cols - 1))
+        for c, (label, value) in enumerate(items):
+            cell = t.cell(r, c)
+            _docx_shade(cell._tc.get_or_add_tcPr(), BRAND_PANEL)
+            _docx_label(cell.paragraphs[0], label, BRAND_GREY)
+            v = cell.add_paragraph()
+            v.paragraph_format.space_after = Pt(2)
+            v.add_run(value).font.size = Pt(10.5)
+    _docx_spacer(doc, 8)
+
+
+def _docx_summary(doc, text: str) -> None:
+    from docx.shared import Pt
+
+    t = doc.add_table(rows=1, cols=1)
+    _docx_table_look(t, {"left": (24, LOGO_PURPLE[1:].upper())}, margin=120)
+    cell = t.cell(0, 0)
+    _docx_shade(cell._tc.get_or_add_tcPr(), BRAND_SOFT)
+    _docx_label(cell.paragraphs[0], "Summary", LOGO_PURPLE[1:].upper())
+    p = cell.add_paragraph()
+    p.paragraph_format.space_after = Pt(2)
+    _docx_inline(p, text)
+    _docx_spacer(doc, 6)
+
+
+def _docx_footer(footer) -> None:
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import RGBColor
+
+    par = footer.paragraphs[0]
+    par.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    brand = par.add_run(APP_NAME)
+    brand.font.bold, brand.font.color.rgb = True, RGBColor.from_string(LOGO_PURPLE[1:].upper())
+    for text, field in (("   ·   Minutes of meeting   ·   Page ", "PAGE"), (" of ", "NUMPAGES")):
+        par.add_run(text)
+        _docx_page_field(par, field)
+
+
+def _docx_branding(doc, titles: list, logo: bytes) -> None:
+    """Notarius look: purple headings, a small logo header on the pages after the first (the first
+    has the masthead), a branded footer with page numbers, and the file's properties (the template
+    would otherwise say "python-docx", created in 2013)."""
+    import io
+
     from docx.oxml.ns import qn
     from docx.shared import Cm, Pt, RGBColor
 
@@ -2154,35 +2271,34 @@ def _docx_branding(doc, titles: list[str]) -> None:
     for name in ("Title", "Heading 1", "Heading 2", "Heading 3"):
         style = doc.styles[name]
         style.font.name, style.font.color.rgb = "Calibri", purple
-        for el in style.element.iter(qn("w:rFonts"), qn("w:color"), qn("w:bottom")):
+        for el in list(style.element.iter(qn("w:rFonts"), qn("w:color"), qn("w:pBdr"))):
+            if el.tag == qn("w:pBdr"):  # the Title's underline: the masthead has the rule now
+                el.getparent().remove(el)
+                continue
             for attr in ("asciiTheme", "hAnsiTheme", "eastAsiaTheme", "cstheme", "themeColor", "themeShade", "themeTint"):
                 el.attrib.pop(qn(f"w:{attr}"), None)  # theme settings would override ours
-            if el.tag == qn("w:bottom"):  # the Title's rule
-                el.set(qn("w:color"), LOGO_PURPLE[1:].upper())
-    doc.styles["Title"].font.size = Pt(22)
+    title = doc.styles["Title"]
+    title.font.size, title.font.bold, title.font.color.rgb = Pt(24), True, RGBColor.from_string(BRAND_INK)
+    title.paragraph_format.space_after = Pt(10)
+    doc.styles["Heading 1"].font.size = Pt(15)
+    doc.styles["Heading 2"].font.size = Pt(12.5)
     doc.styles["Footer"].font.size, doc.styles["Footer"].font.color.rgb = Pt(8.5), grey
 
     section = doc.sections[0]
     section.header_distance = section.footer_distance = Cm(1)
+    section.different_first_page_header_footer = True
     header = section.header.paragraphs[0]
-    png = io.BytesIO()
-    icon_image(size=128).save(png, "PNG")
-    png.seek(0)
-    header.add_run().add_picture(png, height=Cm(0.75))
+    header.add_run().add_picture(io.BytesIO(logo), height=Cm(0.6))
     name = header.add_run(f"  {APP_NAME}")
-    name.font.size, name.font.bold, name.font.color.rgb = Pt(12), True, purple
+    name.font.size, name.font.bold, name.font.color.rgb = Pt(10.5), True, purple
     sub = header.add_run("   Minutes of meeting")
-    sub.font.size, sub.font.color.rgb = Pt(9), grey
+    sub.font.size, sub.font.color.rgb = Pt(8.5), grey
     header.paragraph_format.space_after = Pt(6)
     rule = _docx_el("w:pBdr")
-    rule.append(_docx_el("w:bottom", val="single", sz=6, space=4, color="D0D5DD"))
+    rule.append(_docx_el("w:bottom", val="single", sz=6, space=4, color=BRAND_LINE))
     header._p.get_or_add_pPr().append(rule)
-
-    footer = section.footer.paragraphs[0]
-    footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    for text, field in ((f"Minutes taken by {APP_NAME}   ·   Page ", "PAGE"), (" of ", "NUMPAGES")):
-        footer.add_run(text)
-        _docx_page_field(footer, field)
+    _docx_footer(section.footer)
+    _docx_footer(section.first_page_footer)
 
 
 def export_docx(dirs: list[Path]) -> bytes:
@@ -2190,28 +2306,47 @@ def export_docx(dirs: list[Path]) -> bytes:
 
     from docx import Document
     from docx.enum.text import WD_BREAK
-    from docx.shared import Pt
+    from docx.shared import Pt, RGBColor
 
     doc = Document()
     doc.styles["Normal"].font.name = "Calibri"
     doc.styles["Normal"].font.size = Pt(11)
-    _docx_branding(doc, [(meeting_summary(d) or {}).get("title") or "Teams meeting" for d in dirs])
-    for n, d in enumerate(dirs):
+    png = io.BytesIO()
+    icon_image(size=160).save(png, "PNG")
+    logo = png.getvalue()
+    summaries = [meeting_summary(d) or {} for d in dirs]
+    _docx_branding(doc, [s.get("title") or "Teams meeting" for s in summaries], logo)
+    section = doc.sections[0]
+    width = section.page_width - section.left_margin - section.right_margin
+    for n, (d, info) in enumerate(zip(dirs, summaries)):
         if n:
             doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
         notes = load_text(d / "notes.md") or ""
         done = set(read_json(d / "actions.json", {}).get("done", []))
+        found = re.search(r"\*\*Attendees:\*\*\s*(.+)$", notes, re.M)
+        attendees = found.group(1).strip() if found else ", ".join(info.get("people") or [])
+        _docx_masthead(doc, logo, width)
+        doc.add_heading(info.get("title") or "Teams meeting", level=0)
+        if info.get("date"):
+            when = dt.date.fromisoformat(info["date"])
+            span = f"{info['start']}–{info['end']}" if info.get("end") else info.get("start", "")
+            row = [("Date", f"{when:%A}, {when.day} {when:%B %Y}"), ("Time", span)]
+            if info.get("duration_min"):
+                row.append(("Duration", f"{info['duration_min']} min"))
+            _docx_meta(doc, [row] + ([[("Attendees", attendees)]] if attendees else []), width)
+        if info.get("summary"):
+            _docx_summary(doc, info["summary"])
         lines, i, action_row = notes.splitlines(), 0, 0
         while i < len(lines):
             ln = lines[i].rstrip()
-            if not ln.strip():
+            # Shown above already: the title, the Date/Time/Attendees line, the summary, "Minutes".
+            if not ln.strip() or ln.startswith("# ") or ln.startswith(("**Date:**", "**Summary:**")) \
+                    or re.fullmatch(r"##\s+Minutes\s*", ln) or re.fullmatch(r"<!--.*-->", ln.strip()):
                 i += 1
                 continue
             if m := re.match(r"^(#{1,4})\s+(.*)", ln):
                 level, text = len(m.group(1)), m.group(2).replace("**", "")
-                if level == 1:  # "Minutes of Meeting: <title>": the page header already says that
-                    text = text.split(":", 1)[-1].strip() or text
-                doc.add_heading(text, level=0 if level == 1 else min(level - 1, 3))
+                doc.add_heading(text, level=min(level - 1, 3) or 1)
             elif ln.lstrip().startswith("|"):
                 rows = []
                 while i < len(lines) and lines[i].lstrip().startswith("|"):
@@ -2228,11 +2363,14 @@ def export_docx(dirs: list[Path]) -> bytes:
                 for r, cells in enumerate(rows):
                     for c, cell in enumerate(cells):
                         _docx_inline(table.cell(r, c).paragraphs[0], cell)
-                section = doc.sections[0]
-                _docx_brand_table(table, rows, section.page_width - section.left_margin - section.right_margin)
+                _docx_brand_table(table, rows, width)
                 continue
             elif m := re.match(r"^\s*[-*]\s+(.*)", ln):
-                _docx_inline(doc.add_paragraph(style="List Bullet"), m.group(1))
+                par = doc.add_paragraph(style="List Bullet")
+                _docx_inline(par, m.group(1))
+                if m.group(1).startswith("**Decision:**"):  # decisions stand out, as in the app
+                    _docx_shade(par._p.get_or_add_pPr(), DECISION_FILL)
+                    par.runs[0].font.color.rgb = RGBColor.from_string(DECISION_INK)
             else:
                 _docx_inline(doc.add_paragraph(), ln)
             i += 1
@@ -2999,7 +3137,8 @@ LOGO_N = [  # a Roman inscription capital: slim verticals, heavy diagonal, serif
 LOGO_PURPLE = "#4f46e5"
 LOGO_BUBBLE = (9, 9, 55, 46, 10)                     # x0, y0, x1, y1, corner radius
 LOGO_N_FIT = (0.66, 19.1, 16.3)                      # scale, x offset, y offset for the N inside
-LOGO_NIB_AXIS = ((21.5, 43.0), (10.0, 58.5))         # nib: where it leaves the bubble -> its tip
+LOGO_NIB_AXIS = ((21.5, 43.0), (12.5, 55.0))         # nib: where it leaves the bubble -> its tip (inside the tile)
+LOGO_NIB_HOLE, LOGO_NIB_SLIT = 1.5, 1.3              # breather-hole radius, slit width
 
 
 def _logo_n_point(x: float, y: float) -> tuple[float, float]:
@@ -3019,8 +3158,11 @@ def _logo_nib() -> tuple[list[tuple[float, float]], tuple[float, float], tuple[t
     def at(t: float, w: float) -> tuple[float, float]:
         return bx + ux * t + px * w, by + uy * t + py * w
 
-    outline = [at(-5, 6.2), at(4.5, 6.6), at(9, 4.6), (tx, ty), at(9, -4.6), at(4.5, -6.6), at(-5, -6.2)]
-    return outline, at(6.2, 0), (at(7.6, 0), at(length - 0.6, 0))
+    k = length
+    side = [at(-5, 5.4), at(.25 * k, 5.6), at(.5 * k, 3.9), at(.75 * k, 2.0)]  # shoulder, then taper
+    outline = side + [(tx, ty)] + [at(*_t) for _t in [(tt, -w) for tt, w in ((.75 * k, 2.0), (.5 * k, 3.9), (.25 * k, 5.6), (-5, 5.4))]]
+    # The slit runs from the breather hole and stops short of the tip, which stays a solid point.
+    return outline, at(.38 * k, 0), (at(.38 * k + 1, 0), at(.82 * k, 0))
 
 
 def icon_image(color: str = LOGO_PURPLE, size: int = 64):
@@ -3035,8 +3177,9 @@ def icon_image(color: str = LOGO_PURPLE, size: int = 64):
     d.rounded_rectangle((x0 * s, y0 * s, x1 * s, y1 * s), radius=r * s, fill="white")  # speech bubble
     outline, (hx, hy), ((sx, sy), (ex, ey)) = _logo_nib()
     d.polygon([(x * s, y * s) for x, y in outline], fill="white")                      # tail = pen nib
-    d.line([(sx * s, sy * s), (ex * s, ey * s)], fill=color, width=max(1, round(1.4 * s)))  # nib slit
-    d.ellipse(((hx - 1.7) * s, (hy - 1.7) * s, (hx + 1.7) * s, (hy + 1.7) * s), fill=color)  # breather hole
+    d.line([(sx * s, sy * s), (ex * s, ey * s)], fill=color, width=max(1, round(LOGO_NIB_SLIT * s)))  # nib slit
+    hr = LOGO_NIB_HOLE
+    d.ellipse(((hx - hr) * s, (hy - hr) * s, (hx + hr) * s, (hy + hr) * s), fill=color)  # breather hole
     for poly in LOGO_N:
         d.polygon([tuple(c * s for c in _logo_n_point(x, y)) for x, y in poly], fill=color)
     return img.resize((size, size), Image.LANCZOS)

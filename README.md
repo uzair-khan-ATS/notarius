@@ -66,7 +66,7 @@ More documentation:
   languages, privacy, troubleshooting.
 - **[How it works](docs/ARCHITECTURE.md)**: pipeline, encryption, API, configuration, building
   the `.exe`.
-- **[Roadmap](docs/ROADMAP.md)**: Google Meet, screen-share screenshots, and what comes next.
+- **[Roadmap](docs/ROADMAP.md)**: Teams (share meetings with colleagues who sign in with their email), Google Meet, and what comes next.
 
 ## License
 

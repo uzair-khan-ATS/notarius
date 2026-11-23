@@ -58,6 +58,15 @@ def installed_version() -> str | None:
         return None
 
 
+def installed_here() -> bool:
+    """Whether Settings > Apps points at this install (not at a script install somewhere else)."""
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, UNINSTALL_KEY) as k:
+            return Path(winreg.QueryValueEx(k, "InstallLocation")[0]).resolve() == INSTALL_DIR.resolve()
+    except OSError:
+        return False
+
+
 def app_running() -> bool:
     h = ctypes.windll.kernel32.OpenMutexW(0x00100000, False, "Local\\teams-notetaker-watch")
     if h:
@@ -118,7 +127,7 @@ def main() -> None:
     except OSError as e:
         message(f"{APP_NAME} could not be updated, so the installed version will start.\n\n{e}", 0x30)
 
-    if installed != version or not START_MENU.exists():
+    if installed != version or not START_MENU.exists() or not installed_here():
         if first_time:
             message(f"Setting up {APP_NAME} for the first time.\n\n"
                     "It downloads its speech models (about 3 GB) once, so it can take a few minutes "

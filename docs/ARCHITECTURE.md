@@ -276,9 +276,11 @@ The launcher installs per user, with no admin rights, the way other Windows apps
 1. it copies itself, `notarius.py` and `dashboard.html` to `%LOCALAPPDATA%\Programs\Notarius`
    (program files), separate from `%LOCALAPPDATA%\Notarius` (meetings, voices, models), which
    updates never touch;
-2. when the version changed, it runs `install`. That points the shortcuts at the installed
-   `Notarius.exe`, gives them the app ID, and writes the Settings > Apps entry (version,
-   publisher, icon, size, uninstall command);
+2. when the version changed, or Notarius is installed from somewhere else, it runs `install`.
+   That writes the Settings > Apps entry (version, publisher, icon, size, `Notarius.exe
+   uninstall`) and the shortcuts, with the Notarius icon and app ID. The shortcuts start the app
+   through `uvw.exe` (signed), not `Notarius.exe`: Smart App Control can block an unsigned .exe
+   on one day and allow it on another, and the login item must never fail silently;
 3. it starts the app through `uvw`, passing `NOTARIUS_LAUNCHER` so the app knows it was installed
    by the .exe.
 
